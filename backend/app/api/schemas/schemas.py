@@ -43,3 +43,11 @@ class Progress(BaseModel):
     current_question: int
     time_remaining: int
     timestamp: datetime
+
+class User(BaseModel):
+    student_id: str
+    name: str
+    email: str
+    submissions: List[Submission] = []
+    progresses: List[Progress] = []
+    #role: str  # e.g., "student", "teacher", "admin"
