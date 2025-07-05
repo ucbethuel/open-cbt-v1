@@ -1,3 +1,4 @@
+
 {% extends "admin/change_list.html" %}
 {% load static %}
 
@@ -10,6 +11,20 @@
         <input type="file" name="students_file" accept=".csv,.xls,.xlsx" required>
         <button type="submit" class="default">Upload</button>
     </form>
+    <div class="alert alert-info">
+        <strong>Important:</strong> Please ensure that your file has the following column names:
+        <ul>
+            <li>student_id</li>
+            <li>first_name</li>
+            <li>last_name</li>
+            <li>email</li>
+            <li>phone_number</li>
+            <li>date_of_birth</li>
+            <li>gender</li>
+            <li>course</li>
+        </ul>
+        These column names are case-sensitive and must match exactly.
+    </div>
 </div>
 {% if messages %}
     <ul class="messagelist">

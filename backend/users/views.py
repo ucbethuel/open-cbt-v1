@@ -33,7 +33,7 @@ class StudentLoginAPIView(APIView):
             }, status=status.HTTP_200_OK)
         except Student.DoesNotExist:
             return Response({'error': 'Invalid student_id'}, status=status.HTTP_404_NOT_FOUND)
-        
+
 
 class StudentBatchUploadAPIView(APIView):
     parser_classes = [MultiPartParser]
@@ -51,15 +51,68 @@ class StudentBatchUploadAPIView(APIView):
         else:
             return Response({'error': 'Unsupported file type'}, status=status.HTTP_400_BAD_REQUEST)
 
+        required_fields = ['student_id', 'first_name', 'last_name', 'course']
+        for field in required_fields:
+            if field not in df.columns:
+                return Response({'error': f'Missing required field: {field}'}, status=status.HTTP_400_BAD_REQUEST)
+
         created = 0
         for _, row in df.iterrows():
             student_id = str(row.get('student_id')).strip()
+            first_name = str(row.get('first_name')).strip()
+            last_name = str(row.get('last_name')).strip()
             course = str(row.get('course')).strip()
-            if student_id and course:
+            email = str(row.get('email', '')).strip()
+            phone_number = str(row.get('phone_number', '')).strip()
+            date_of_birth = row.get('date_of_birth')
+            gender = str(row.get('gender', '')).strip()
+            if student_id and first_name and last_name and course:
                 Student.objects.get_or_create(
                     student_id=student_id,
-                    defaults={'course': course, 'created_by': request.user}
+                    defaults={
+                        'first_name': first_name,
+                        'last_name': last_name,
+                        'email': email,
+                        'phone_number': phone_number,
+                        'date_of_birth': date_of_birth,
+                        'gender': gender,
+                        'course': course,
+                        'created_by': request.user
+                    }
                 )
                 created += 1
 
         return Response({'message': f'{created} students uploaded successfully.'}, status=status.HTTP_201_CREATED)
+    
+
+
+# Old Batch upload code
+
+# class StudentBatchUploadAPIView(APIView):
+#     parser_classes = [MultiPartParser]
+
+#     def post(self, request):
+#         file = request.FILES.get('file')
+#         if not file:
+#             return Response({'error': 'No file uploaded'}, status=status.HTTP_400_BAD_REQUEST)
+
+#         # Determine file type
+#         if file.name.endswith('.csv'):
+#             df = pd.read_csv(file)
+#         elif file.name.endswith(('.xls', '.xlsx')):
+#             df = pd.read_excel(file)
+#         else:
+#             return Response({'error': 'Unsupported file type'}, status=status.HTTP_400_BAD_REQUEST)
+
+#         created = 0
+#         for _, row in df.iterrows():
+#             student_id = str(row.get('student_id')).strip()
+#             course = str(row.get('course')).strip()
+#             if student_id and course:
+#                 Student.objects.get_or_create(
+#                     student_id=student_id,
+#                     defaults={'course': course, 'created_by': request.user}
+#                 )
+#                 created += 1
+
+#         return Response({'message': f'{created} students uploaded successfully.'}, status=status.HTTP_201_CREATED)
