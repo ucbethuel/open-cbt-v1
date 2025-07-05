@@ -1,0 +1,21 @@
+{% extends "admin/change_list.html" %}
+{% load static %}
+
+{% block content %}
+{{ block.super }}
+<div class="submit-row">
+    <form method="post" enctype="multipart/form-data" action="upload-students/">
+        {% csrf_token %}
+        <label for="students_file"><strong>Upload Students (CSV or Excel):</strong></label>
+        <input type="file" name="students_file" accept=".csv,.xls,.xlsx" required>
+        <button type="submit" class="default">Upload</button>
+    </form>
+</div>
+{% if messages %}
+    <ul class="messagelist">
+        {% for message in messages %}
+            <li{% if message.tags %} class="{{ message.tags }}"{% endif %}>{{ message }}</li>
+        {% endfor %}
+    </ul>
+{% endif %}
+{% endblock %}
