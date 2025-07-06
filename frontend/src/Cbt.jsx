@@ -1,5 +1,3 @@
-
-
 import React, { useState, useEffect, useRef } from 'react';
 import './index.css'
 
@@ -59,11 +57,9 @@ const Cbt = () => {
         },
         ...options
       });
-
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);
       }
-
       return await response.json();
     } catch (error) {
       console.error('API call failed:', error);
@@ -71,123 +67,34 @@ const Cbt = () => {
     }
   };
 
-  // Load questions for selected subject
+  // Session state
+  const [sessionId, setSessionId] = useState(null);
+
+  // Load questions for selected subject from backend
   const loadQuestions = async (subjectId) => {
     setLoading(true);
     setError(null);
-    
     try {
-      // For demo purposes, using mock data. Replace with actual API call
-      const mockQuestions = await getMockQuestions(subjectId);
-      
-      // Uncomment below for real API integration
-      // const data = await apiCall(`/questions/${subjectId}?examId=${studentInfo.examId}`);
-      
-      setQuestions(mockQuestions);
+      // Create or fetch session from backend
+      // Replace with your backend endpoint for session creation
+      const sessionResp = await apiCall(`/sessions/start/`, {
+        method: 'POST',
+        body: JSON.stringify({
+          student: studentInfo.studentId,
+          exam: studentInfo.examId,
+          subject: subjectId
+        })
+      });
+      setSessionId(sessionResp.id);
+      // Fetch questions for this subject
+      const data = await apiCall(`/questions/?subject=${subjectId}&exam=${studentInfo.examId}`);
+      setQuestions(data);
     } catch (err) {
       setError(`Failed to load questions: ${err.message}`);
       setQuestions([]);
     } finally {
       setLoading(false);
     }
-  };
-
-  // Mock function - Replace with actual API call
-  const getMockQuestions = async (subjectId) => {
-    // Simulate API delay
-    await new Promise(resolve => setTimeout(resolve, 1000));
-    
-    const questionSets = {
-      math: [
-        {
-          id: 1,
-          text: "If a company purchased a machine for $80,000 with a salvage value of $10,000 and a useful life of 5 years, what is the annual straight-line depreciation expense?",
-          options: [
-            { id: "A", text: "$14,000" },
-            { id: "B", text: "$16,000" },
-            { id: "C", text: "$18,000" },
-            { id: "D", text: "$20,000" }
-          ],
-          correctAnswer: "A"
-        },
-        {
-          id: 2,
-          text: "Solve for x: 2x + 5 = 15",
-          options: [
-            { id: "A", text: "x = 5" },
-            { id: "B", text: "x = 10" },
-            { id: "C", text: "x = 7.5" },
-            { id: "D", text: "x = 2.5" }
-          ],
-          correctAnswer: "A"
-        }
-      ],
-      english: [
-        {
-          id: 3,
-          text: "Choose the correct form: 'She ___ to the market every day.'",
-          options: [
-            { id: "A", text: "go" },
-            { id: "B", text: "goes" },
-            { id: "C", text: "going" },
-            { id: "D", text: "gone" }
-          ],
-          correctAnswer: "B"
-        },
-        {
-          id: 4,
-          text: "What is the plural form of 'child'?",
-          options: [
-            { id: "A", text: "childs" },
-            { id: "B", text: "childes" },
-            { id: "C", text: "children" },
-            { id: "D", text: "child" }
-          ],
-          correctAnswer: "C"
-        }
-      ],
-      physics: [
-        {
-          id: 5,
-          text: "What is the SI unit of force?",
-          options: [
-            { id: "A", text: "Joule" },
-            { id: "B", text: "Newton" },
-            { id: "C", text: "Pascal" },
-            { id: "D", text: "Watt" }
-          ],
-          correctAnswer: "B"
-        }
-      ],
-      chemistry: [
-        {
-          id: 6,
-          text: "What is the chemical symbol for Gold?",
-          options: [
-            { id: "A", text: "Go" },
-            { id: "B", text: "Gd" },
-            { id: "C", text: "Au" },
-            { id: "D", text: "Ag" }
-          ],
-          correctAnswer: "C"
-        }
-      ],
-      biology: [
-        {
-          id: 7,
-          text: "Which organ is responsible for pumping blood?",
-          options: [
-            { id: "A", text: "Liver" },
-            { id: "B", text: "Kidney" },
-            { id: "C", text: "Heart" },
-            { id: "D", text: "Lungs" }
-          ],
-          correctAnswer: "C"
-        }
-      ]
-    };
-
-    return questionSets[subjectId] || [];
   };
 
   // Utility functions
@@ -198,11 +105,29 @@ const Cbt = () => {
     return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
   };
 
-  const handleAnswerSelect = (questionId, optionId) => {
+  // Submit answer to backend
+  const submitAnswer = async (questionId, selectedOption) => {
+    if (!sessionId) return;
+    try {
+      await apiCall(`/answers/`, {
+        method: 'POST',
+        body: JSON.stringify({
+          session: sessionId,
+          question: questionId,
+          selected_option: selectedOption
+        })
+      });
+    } catch (error) {
+      setError('Failed to submit answer.');
+    }
+  };
+
+  const handleAnswerSelect = (questionId, optionLetter) => {
     setSelectedAnswers(prev => ({
       ...prev,
-      [questionId]: optionId
+      [questionId]: optionLetter
     }));
+    submitAnswer(questionId, optionLetter);
   };
 
   const toggleFlagQuestion = () => {
@@ -250,19 +175,19 @@ const Cbt = () => {
   // Keyboard Shortcuts - Fixed the questionSets reference
   useEffect(() => {
     const handleKeyDown = (e) => {
-      const key = e.key.toUpperCase();
+      const key = e.key.toLowerCase();
       const currentQuestion = questions[currentQuestionIndex];
       if (!currentQuestion) return;
 
-      if (['A', 'B', 'C', 'D'].includes(key)) {
+      if (["a", "b", "c", "d"].includes(key)) {
         handleAnswerSelect(currentQuestion.id, key);
-      } else if (key === 'N') {
+      } else if (key === "n") {
         handleNextQuestion();
-      } else if (key === 'P') {
+      } else if (key === "p") {
         handlePreviousQuestion();
-      } else if (key === 'S') {
+      } else if (key === "s") {
         handleSubmitExam();
-      } else if (key === 'R') {
+      } else if (key === "r") {
         setSelectedAnswers((prev) => {
           const newAnswers = { ...prev };
           delete newAnswers[currentQuestion.id];
@@ -271,8 +196,8 @@ const Cbt = () => {
       }
     };
 
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
   }, [questions, currentQuestionIndex, selectedAnswers]);
 
   // Save progress to backend
@@ -319,9 +244,11 @@ const Cbt = () => {
   const submitExam = async () => {
     try {
       const submissionData = {
-        studentId: studentInfo.studentId,
-        examId: studentInfo.examId,
-        answers: selectedAnswers,
+        session: sessionId,
+        answers: Object.entries(selectedAnswers).map(([question, selected_option]) => ({
+          question,
+          selected_option
+        })),
         submissionTime: new Date().toISOString(),
         timeUsed: CONFIG.EXAM_DURATION - timeRemaining
       };
@@ -556,28 +483,28 @@ const Cbt = () => {
 
                 {/* Options */}
                 <div className="space-y-3">
-                  {currentQuestion?.options.map(option => (
+                  {['a', 'b', 'c', 'd'].map(letter => (
                     <div
-                      key={option.id}
-                      onClick={() => handleAnswerSelect(currentQuestion.id, option.id)}
+                      key={letter}
+                      onClick={() => handleAnswerSelect(currentQuestion.id, letter)}
                       className={`p-4 border rounded-md cursor-pointer transition-all hover:bg-gray-50 ${
-                        selectedAnswers[currentQuestion.id] === option.id
+                        selectedAnswers[currentQuestion.id] === letter
                           ? 'border-blue-500 bg-blue-50'
                           : 'border-gray-200'
                       }`}
                     >
                       <div className="flex items-center">
                         <div className={`w-5 h-5 rounded-full border flex items-center justify-center mr-3 ${
-                          selectedAnswers[currentQuestion.id] === option.id
+                          selectedAnswers[currentQuestion.id] === letter
                             ? 'border-blue-500'
                             : 'border-gray-400'
                         }`}>
-                          {selectedAnswers[currentQuestion.id] === option.id && (
+                          {selectedAnswers[currentQuestion.id] === letter && (
                             <div className="w-3 h-3 bg-blue-500 rounded-full"></div>
                           )}
                         </div>
-                        <span className="font-medium text-gray-700 mr-2">{option.id}.</span>
-                        <span className="text-gray-700">{option.text}</span>
+                        <span className="font-medium text-gray-700 mr-2">{letter.toUpperCase()}.</span>
+                        <span className="text-gray-700">{currentQuestion[`option_${letter}`]}</span>
                       </div>
                     </div>
                   ))}
