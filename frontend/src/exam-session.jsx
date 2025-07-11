@@ -1,12 +1,19 @@
+import useKeyboardShortcuts from "./hooks/useKeyboardShortcuts";
+import {handleAnswerSelect, handleSubmitExam, handleNextQuestion, handlePreviousQuestion} from "./helpers/keyboardShortcode";
+import handleCalculatorOperation from "./helpers/calculator";
+import bootstrapStyle from "./styles/bootstrapStyle";
 import React, { useState, useEffect, useRef } from 'react';
 import { useLocation } from 'react-router-dom';
 import ProgressBar from './components/progressBar'; 
+import CONFIG from './config'; // Assuming you have a config file for constants
 
 const Exam = () => {
+  // CONFIG = CONFIG;
   // Configuration - Easy to modify
-  const CONFIG = {
+  let CONFIG = {
     EXAM_DURATION: 7200, // 2 hours in seconds
-    API_BASE_URL: 'https://api.example.com', // Replace with your backend URL
+    API_BASE_URL: 'http://127.0.0.1:8000', // Replace with your backend URL
+    API_PATH: '/api/',
     WARNING_TIMES: [1800, 900, 300], // 30, 15, 5 minutes warnings
     SUBJECTS: [
       { id: 'math', name: 'Mathematics', code: 'MTH' },
@@ -20,11 +27,13 @@ const Exam = () => {
 
 const location = useLocation();
 const studentId = location.state?.studentId || 'GUEST';
-
+// console.log(studentId.student_id)
+const rawStudentData = localStorage.getItem('studentData');
+  const studentData = rawStudentData ? JSON.parse(rawStudentData) : null;
 
   // Student Information - Will come from authentication
   const [studentInfo] = useState({
-    name: 'John Doe',
+    name: studentData.first_name + " " + studentData.last_name,
     studentId: studentId, // Replace with actual student ID
     examId: 'CBT_2025_001',
     course: 'JAMB CBT Examination'
@@ -184,12 +193,7 @@ const studentId = location.state?.studentId || 'GUEST';
     return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
   };
 
-  const handleAnswerSelect = (questionId, optionId) => {
-    setSelectedAnswers(prev => ({
-      ...prev,
-      [questionId]: optionId
-    }));
-  };
+  
 
   const toggleFlagQuestion = () => {
     if (!questions[currentQuestionIndex]) return;
@@ -212,17 +216,7 @@ const studentId = location.state?.studentId || 'GUEST';
     }
   };
 
-  const handleNextQuestion = () => {
-    if (currentQuestionIndex < questions.length - 1) {
-      setCurrentQuestionIndex(currentQuestionIndex + 1);
-    }
-  };
-
-  const handlePreviousQuestion = () => {
-    if (currentQuestionIndex > 0) {
-      setCurrentQuestionIndex(currentQuestionIndex - 1);
-    }
-  };
+  
 
   const getQuestionStatusClass = (index) => {
     if (!questions[index]) return 'btn-secondary';
@@ -230,38 +224,24 @@ const studentId = location.state?.studentId || 'GUEST';
     const questionId = questions[index].id;
     if (flaggedQuestions.has(questionId)) return 'btn-warning';
     if (selectedAnswers[questionId]) return 'btn-success';
+
     return 'btn-danger';
   };
 
+  
   // Keyboard Shortcuts
-  useEffect(() => {
-    const handleKeyDown = (e) => {
-      const key = e.key.toUpperCase();
-      const currentQuestion = questions[currentQuestionIndex];
-      if (!currentQuestion) return;
-
-      if (['A', 'B', 'C', 'D'].includes(key)) {
-        handleAnswerSelect(currentQuestion.id, key);
-      } else if (key === 'N') {
-        handleNextQuestion();
-      } else if (key === 'P') {
-        handlePreviousQuestion();
-      } else if (key === 'S') {
-        handleSubmitExam();
-      } else if (key === 'R') {
-        setSelectedAnswers((prev) => {
-          const newAnswers = { ...prev };
-          delete newAnswers[currentQuestion.id];
-          return newAnswers;
-        });
-      }
-    };
-
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [questions, currentQuestionIndex, selectedAnswers]);
+useKeyboardShortcuts({
+  questions,
+  currentQuestionIndex,
+  handleAnswerSelect,
+  handleNextQuestion,
+  handlePreviousQuestion,
+  handleSubmitExam,
+  setSelectedAnswers,
+});
 
   // Save progress to backend
+  // TODO: Modularise this functions
   const saveProgress = async () => {
     try {
       const progressData = {
@@ -282,6 +262,7 @@ const studentId = location.state?.studentId || 'GUEST';
   };
 
   // Load saved progress
+  // TODO: Modularise this functions
   const loadProgress = async () => {
     try {
       // Mock implementation
@@ -291,6 +272,7 @@ const studentId = location.state?.studentId || 'GUEST';
   };
 
   // Submit exam
+  // TODO: Modularise this functions
   const submitExam = async () => {
     try {
       const submissionData = {
@@ -310,6 +292,7 @@ const studentId = location.state?.studentId || 'GUEST';
   };
 
   // Handle subject change
+  // TODO: Modularise this functions
   const handleSubjectChange = (index) => {
     setCurrentSubject(index);
     setCurrentQuestionIndex(0);
@@ -318,19 +301,6 @@ const studentId = location.state?.studentId || 'GUEST';
     loadQuestions(CONFIG.SUBJECTS[index].id);
   };
 
-  const handleSubmitExam = () => {
-    const unansweredCount = questions.length - Object.keys(selectedAnswers).length;
-    
-    if (unansweredCount > 0) {
-      if (!window.confirm(`You have ${unansweredCount} unanswered questions. Are you sure you want to submit?`)) {
-        return;
-      }
-    }
-    
-    if (window.confirm('Are you sure you want to submit your exam? This action cannot be undone.')) {
-      submitExam();
-    }
-  };
 
   
 
@@ -372,23 +342,6 @@ const studentId = location.state?.studentId || 'GUEST';
 
   const progress = questions.length > 0 ? (Object.keys(selectedAnswers).length / questions.length * 100) : 0;
 
-  // Calculator functions
-  const handleCalculatorOperation = (value) => {
-    if (value === 'C') {
-      setCalculatorValue('0');
-    } else if (value === '=') {
-      try {
-        const result = Function('"use strict"; return (' + calculatorValue + ')')();
-        setCalculatorValue(result.toString());
-      } catch (error) {
-        setCalculatorValue('Error');
-      }
-    } else if (value === 'CE') {
-      setCalculatorValue(prev => prev.length > 1 ? prev.slice(0, -1) : '0');
-    } else {
-      setCalculatorValue(prev => prev === '0' ? value : prev + value);
-    }
-  };
 
   const handleMouseDown = (e) => {
     dragRef.current.isDragging = true;
@@ -407,94 +360,6 @@ const studentId = location.state?.studentId || 'GUEST';
   const handleMouseUp = () => {
     dragRef.current.isDragging = false;
   };
-
-  // Bootstrap CSS and JS
-  const bootstrapStyle = `
-    .exam-container {
-      height: 100vh;
-    //   overflow: hidden;
-    }
-    
-    .exam-header {
-      height: auto;
-      min-height: 120px;
-    }
-    
-    .exam-main {
-      flex: 1 1 auto; overflow-y: auto;
-    }
-    
-    .exam-footer {
-    //   height: 10vh;
-      min-height: 60px;
-    }
-    
-    .question-area {
-      height: 100%;
-      overflow-y: auto;
-    }
-    
-    .sidebar {
-      height: 100%;
-      overflow-y: auto;
-    }
-    
-    .question-palette {
-      max-height: 200px;
-      overflow-y: auto;
-    }
-    
-    .calculator {
-      position: fixed;
-      z-index: 1050;
-      background: white;
-      border: 1px solid #dee2e6;
-      border-radius: 0.375rem;
-      box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.15);
-    }
-    
-    .calculator-header {
-      background: #343a40;
-      color: white;
-      cursor: move;
-      user-select: none;
-    }
-    
-    .time-critical {
-      background-color: #f8d7da !important;
-      color: #721c24 !important;
-    }
-    
-    .time-warning {
-      background-color: #fff3cd !important;
-      color: #856404 !important;
-    }
-    
-    .answer-option {
-      transition: all 0.2s ease;
-      cursor: pointer;
-    }
-    
-    .answer-option:hover {
-      background-color: #f8f9fa !important;
-    }
-    
-    .answer-option.selected {
-      background-color: #cce7ff !important;
-      border-color: #0d6efd !important;
-    }
-    
-    .question-btn {
-      width: 40px;
-      height: 40px;
-      font-size: 0.875rem;
-      font-weight: bold;
-    }
-    
-    .question-btn.active {
-      box-shadow: 0 0 0 0.2rem rgba(13, 110, 253, 0.25);
-    }
-  `;
 
   // Loading state
   if (loading && questions.length === 0) {
@@ -540,6 +405,9 @@ const studentId = location.state?.studentId || 'GUEST';
 
   const currentQuestion = questions[currentQuestionIndex];
 
+
+
+  // Render Logic.
   return (
     <>
       <style>{bootstrapStyle}</style>

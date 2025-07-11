@@ -4,9 +4,11 @@ from django.shortcuts import render
 
 from rest_framework import viewsets
 from .models import Exam, Subject, Question
-from .serializers import ExamSerializer, SubjectSerializer, QuestionSerializer
+from users.models import Student
+from .serializers import ExamSerializer, SubjectSerializer, QuestionSerializer, ExamGroupSerializer
 from rest_framework.views import APIView
 from rest_framework.response import Response
+from rest_framework.decorators import api_view
 from rest_framework import status
 from django.db import transaction
 import pandas as pd
@@ -23,6 +25,35 @@ class SubjectViewSet(viewsets.ModelViewSet):
 class QuestionViewSet(viewsets.ModelViewSet):
     queryset = Question.objects.all()
     serializer_class = QuestionSerializer
+# @api_view(["GET"])
+class StudentExamViewSet(viewsets.ViewSet):
+
+    @action(detail=True, methods=["get"])
+    def data(self, request, pk=None):
+        try:
+            student = Student.objects.get(student_id=pk)
+        except Student.DoesNotExist:
+            return Response({
+                "error": "Student not found"
+            }, status=404)
+        # Get all ExamGroup the student is part of
+        exam_group = student.exam_groups.all()
+
+        # Get all related Subjects (many-to-many)
+        subjects = Subject.objects.filter(exam_groups__in=exam_group)
+
+        # Get all related Questions under those Subjects
+        questions = Question.objects.filter(subject__in=subjects).distinct()
+
+        # Serialize data
+        subject_data = SubjectSerializer(subjects, many=True).data
+        question_data = QuestionSerializer(questions, many=True).data
+
+        return Response([{
+            "student_id": student.student_id,
+            "subjects": subject_data,
+            "questions": question_data
+        }])
 
 class UploadQuestionsView(APIView):
     def post(self, request, *args, **kwargs):

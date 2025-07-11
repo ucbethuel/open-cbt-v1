@@ -1,4 +1,5 @@
 from django.db import models
+from users.models import Student
 
 # Create your models here.
 class Exam(models.Model):
@@ -30,7 +31,16 @@ class Question(models.Model):
         ('c', 'Option C'),
         ('d', 'Option D'),
     ]
-    # answer = models.CharField(max_length=1, choices=ANSWER_CHOICES, default="a    answer = models.CharField(max_length=1, choices=ANSWER_CHOICES, default='a')")
     answer = models.CharField(max_length=1, choices=ANSWER_CHOICES, default='a')
     def __str__(self):
         return f"Q{self.id}: {self.text[:50]}"
+    
+class ExamGroup(models.Model):
+    exam = models.ForeignKey(Exam, on_delete=models.CASCADE)
+    student = models.ManyToManyField(Student, related_name='exam_groups')
+    subject = models.ManyToManyField(Subject, related_name='exam_groups')
+    name= models.CharField(max_length=200)
+
+    def __str__(self):
+        return self.name
+

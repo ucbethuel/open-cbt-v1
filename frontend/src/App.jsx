@@ -873,7 +873,7 @@
 import React from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
 import Login from './Login';
-import Exam from './complete';
+import Exam from './exam-session';
 
 const App = () => {
   return (
@@ -882,7 +882,8 @@ const App = () => {
       <Route path="/" element={<Navigate to="/login" replace />} />
       
       <Route path="/login" element={<Login />} />
-      <Route path="/complete" element={<Exam />} />
+      <Route path="/exam" element={<Exam />} />
+      <Route path="/exam-session" element={<Exam />} />
     </Routes>
   );
 };

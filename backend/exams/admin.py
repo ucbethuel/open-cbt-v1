@@ -4,7 +4,7 @@ from django.contrib import messages
 from django.shortcuts import redirect
 from django.template.response import TemplateResponse
 import pandas as pd
-from .models import Exam, Subject, Question
+from .models import Exam, Subject, Question, ExamGroup
 
 # Register your models here.
 # admin.site.register([Exam, Subject, Question, Option])
@@ -147,3 +147,8 @@ class QuestionAdmin(admin.ModelAdmin):
             subjects=Subject.objects.all(),
         )
         return TemplateResponse(request, 'admin/exams/question/change_list.html', context)
+
+@admin.register(ExamGroup)
+class ExamGroupAdmin(admin.ModelAdmin):
+    list_display = ('exam', 'name')
+    search_fields = ('exam', 'student')
