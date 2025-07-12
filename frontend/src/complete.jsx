@@ -247,7 +247,7 @@ const studentId = location.state?.studentId || 'GUEST';
       } else if (key === 'P') {
         handlePreviousQuestion();
       } else if (key === 'S') {
-        handleSubmitExam();
+        handleSubmitExam();                 
       } else if (key === 'R') {
         setSelectedAnswers((prev) => {
           const newAnswers = { ...prev };

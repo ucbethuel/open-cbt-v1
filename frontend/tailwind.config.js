@@ -1,8 +1,8 @@
 // tailwind.config.js
 export default {
   content: [
-    "./src/**/*.{js,jsx,ts,tsx}", // 👈 important!
-    "./public/index.html"
+    "./index.html",
+    "./src/**/*.{js,ts,jsx,tsx}",
   ],
   theme: {
     extend: {},
