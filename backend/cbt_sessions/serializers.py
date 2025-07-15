@@ -1,10 +1,12 @@
 from rest_framework import serializers
 from .models import ExamSession, Answer
+from exams.models import Question
 
 
 class AnswerSerializer(serializers.ModelSerializer):
-    # Optional: Show question text or ID
     question_text = serializers.CharField(source='question.text', read_only=True)
+    subject_id = serializers.IntegerField(source='question.subject.id', read_only=True)
+    choices = serializers.SerializerMethodField()
 
     class Meta:
         model = Answer
@@ -12,17 +14,48 @@ class AnswerSerializer(serializers.ModelSerializer):
             'id',
             'session',
             'question',
+            'subject_id',
             'question_text',
+            'choices',
             'selected_option',
             'correct_option',
             'is_correct',
+            'awarded_grade',
+            'question_start_at',
             'answered_at',
+            'question_duration_spent',
+            'grade'
         ]
-        read_only_fields = ['correct_option', 'is_correct', 'answered_at']
+        read_only_fields = [
+            'correct_option',
+            'is_correct',
+            'awarded_grade',
+            'answered_at',
+            'choices',
+            'question_text',
+            'subject_id'
+        ]
+        extra_kwargs = {
+            'session': {'read_only': True}
+        }
+
+    def get_choices(self, obj):
+        return {
+            'a': obj.question.option_a,
+            'b': obj.question.option_b,
+            'c': obj.question.option_c,
+            'd': obj.question.option_d
+        }
+
+    def validate_selected_option(self, value):
+        if value not in ['a', 'b', 'c', 'd']:
+            raise serializers.ValidationError("Invalid selected option. Must be one of: a, b, c, d.")
+        return value
 
 
 class ExamSessionSerializer(serializers.ModelSerializer):
-    answers = AnswerSerializer(many=True, read_only=True)  # Nested
+    answers = AnswerSerializer(many=True, read_only=True)
+    subject = serializers.SerializerMethodField()
 
     class Meta:
         model = ExamSession
@@ -32,45 +65,78 @@ class ExamSessionSerializer(serializers.ModelSerializer):
             'exam',
             'subject',
             'started_at',
+            'ended_at',
             'time_remaining',
-            'duration',           # if added
-            'submitted_at',       # if added
+            'duration',
             'current_question',
             'flagged_questions',
             'completed',
-            'answers',
+            'answers'
         ]
+
+    def get_subject(self, obj):
+        return str(obj.exam.subject)
 
 
 class ExamSessionUpdateSerializer(serializers.ModelSerializer):
-    answers = AnswerSerializer(many=True, write_only=True)
+    answers = AnswerSerializer(many=True, write_only=True, required=False)
+    flagged_questions = serializers.PrimaryKeyRelatedField(
+        many=True,
+        queryset=Question.objects.all(),
+        required=False
+    )
 
     class Meta:
         model = ExamSession
         fields = [
-            'id',
             'time_remaining',
             'current_question',
             'flagged_questions',
-            'answers',
+            'completed',
+            'ended_at',
+            'answers'
         ]
+        extra_kwargs = {
+            'ended_at': {'required': False}
+        }
 
     def update(self, instance, validated_data):
-        # Update session fields
-        instance.time_remaining = validated_data.get('time_remaining', instance.time_remaining)
-        instance.current_question = validated_data.get('current_question', instance.current_question)
+        # Update session core fields
+        for field in ['time_remaining', 'current_question', 'completed', 'ended_at']:
+            if field in validated_data:
+                setattr(instance, field, validated_data[field])
+
+        # Handle flagged questions
+        if 'flagged_questions' in validated_data:
+            instance.flagged_questions.set(validated_data['flagged_questions'])
+
         instance.save()
 
-        # Handle answer updates
+        # Process answers if provided
         answers_data = validated_data.get('answers', [])
         for answer_data in answers_data:
             question = answer_data['question']
-            selected_option = answer_data['selected_option']
-            # Update or create the Answer
+            selected_option = answer_data.get('selected_option')
+
+            # Compute correctness and grade
+            correct_option = question.answer
+            is_correct = selected_option == correct_option
+            awarded_grade = question.score if is_correct else 0.00
+
+            # Create or update answer
             Answer.objects.update_or_create(
                 session=instance,
                 question=question,
-                defaults={'selected_option': selected_option}
+                defaults={
+                    'selected_option': selected_option,
+                    'correct_option': correct_option,
+                    'is_correct': is_correct,
+                    'awarded_grade': awarded_grade,
+                    'question_start_at': answer_data.get('question_start_at'),
+                    'answered_at': answer_data.get('answered_at'),
+                    'question_duration_spent': answer_data.get('question_duration_spent'),
+                    'grade': answer_data.get('grade'),
+                }
             )
 
         return instance

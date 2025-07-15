@@ -2,9 +2,6 @@ from django.http import JsonResponse
 from django.urls import path
 from .views import StudentLoginAPIView, StudentBatchUploadAPIView
 
-# router = routers.DefaultRouter()
-# # router.register(r'students', StudentViewSet)
-
 urlpatterns = [
     # path('', include(router.urls)),
     path('debug/', lambda request: JsonResponse({'message': 'Debug endpoint'}), name='debug'),

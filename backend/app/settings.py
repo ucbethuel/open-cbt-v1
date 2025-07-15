@@ -44,7 +44,7 @@ INSTALLED_APPS = [
     "users",
     "exams",
     "cbt_sessions",
-    "adminpanel",
+    "institutions",
     "results",
 ]
 
@@ -134,8 +134,11 @@ STATIC_URL = "static/"
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
 REST_FRAMEWORK = {
+    'DEFAULT_AUTHENTICATION_CLASSES': [
+        'users.authentication.StudentIDAuthentication',
+    ],
     'DEFAULT_PERMISSION_CLASSES': [
-        'rest_framework.permissions.AllowAny',
+        'rest_framework.permissions.AllowAny',  # Or change to IsAuthenticated if needed globally
     ],
     'DEFAULT_RENDERER_CLASSES': [
         'rest_framework.renderers.JSONRenderer',
@@ -147,6 +150,7 @@ REST_FRAMEWORK = {
         'rest_framework.parsers.MultiPartParser'
     ],
 }
+
 
 CORS_ALLOWED_ORIGINS = [
     "http://localhost:5173",

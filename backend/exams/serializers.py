@@ -5,15 +5,16 @@ from .models import Exam, Subject, Question, ExamGroup
 class ExamSerializer(serializers.ModelSerializer):
     class Meta:
         model = Exam
-        fields = ['id', 'exam_id', 'name', 'date']
+        fields = ['id', 'exam_id', 'subject', 'name', 'date', 'duration']
+       
 
 
 class SubjectSerializer(serializers.ModelSerializer):
-    exam_name = serializers.CharField(source='exam.name', read_only=True)
+    # exam_name = serializers.CharField(source='exam.name', read_only=True)
 
     class Meta:
         model = Subject
-        fields = ['id', 'exam', 'exam_name', 'name', 'code']
+        fields = ['id', 'name', 'code']
 
 
 class QuestionSerializer(serializers.ModelSerializer):
@@ -27,8 +28,10 @@ class QuestionSerializer(serializers.ModelSerializer):
             'text',
             'option_a', 'option_b', 'option_c', 'option_d',
             'choices',
-            'answer',  # ⚠️ Optional: remove from output if this goes to students
+            # 'score',
+            # 'answer',  # ⚠️ Optional: remove from output if this goes to students
         ]
+        
 
     def get_choices(self, obj):
         return {
@@ -40,20 +43,18 @@ class QuestionSerializer(serializers.ModelSerializer):
 
 
 class ExamGroupSerializer(serializers.ModelSerializer):
-    exam_name = serializers.CharField(source='exam.name', read_only=True)
     subject_names = serializers.SerializerMethodField()
 
     class Meta:
         model = ExamGroup
         fields = [
             'id',
-            'name',
             'exam',
-            'exam_name',
             'student',
-            'subject',
-            'subject_names',
+            'name',
+            'subjects'
+            'institution',
         ]
 
     def get_subject_names(self, obj):
-        return [subject.name for subject in obj.subject.all()]
+        return [(subject.id ,subject.name, subject.code) for subject in obj.exam.subject.all()]

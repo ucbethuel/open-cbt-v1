@@ -1,6 +1,6 @@
 from django.contrib import admin
-# from results.models import ExamResult, ResultDetail
+from results.models import Result
 
 # # Register your models here.
 # admin.site.register(ExamResult)
-# admin.site.register(ResultDetail)
+admin.site.register(Result)

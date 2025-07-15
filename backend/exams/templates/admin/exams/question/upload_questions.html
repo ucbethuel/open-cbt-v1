@@ -1,0 +1,44 @@
+{% extends "admin/base_site.html" %}
+{% load static %}
+
+{% block content %}
+<h1>Upload Questions</h1>
+
+<form method="post" enctype="multipart/form-data" action="">
+    {% csrf_token %}
+    <label for="subject_id"><strong>Select Subject:</strong></label>
+    <select name="subject_id" required>
+        <option value="">-- Select Subject --</option>
+        {% for subject in subjects %}
+            <option value="{{ subject.id }}">{{ subject.name }} ({{ subject.code }})</option>
+        {% endfor %}
+    </select>
+    <br><br>
+    <label for="questions_file"><strong>Upload Questions (CSV or Excel):</strong></label>
+    <input type="file" name="questions_file" accept=".csv,.xls,.xlsx" required>
+    <button type="submit" class="default">Upload</button>
+</form>
+
+<div class="alert alert-info">
+    <strong>Important:</strong> Your file must have these columns:
+    <ul>
+        <li>question</li>
+        <li>option_a</li>
+        <li>option_b</li>
+        <li>option_c</li>
+        <li>option_d</li>
+        <li>answer</li>
+        <li>score</li>
+    </ul>
+</div>
+
+{% if messages %}
+    <ul class="messagelist">
+        {% for message in messages %}
+            <li{% if message.tags %} class="{{ message.tags }}"{% endif %}>{{ message }}</li>
+        {% endfor %}
+    </ul>
+{% endif %}
+
+<p><a href="{% url 'admin:exams_question_changelist' %}">Back to Questions</a></p>
+{% endblock %}

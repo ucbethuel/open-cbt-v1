@@ -3,7 +3,7 @@ from django.shortcuts import render
 # Create your views here.
 
 from rest_framework import viewsets
-from .models import Exam, Subject, Question
+from .models import Exam, Subject, Question, ExamGroup
 from users.models import Student
 from .serializers import ExamSerializer, SubjectSerializer, QuestionSerializer, ExamGroupSerializer
 from rest_framework.views import APIView
@@ -26,6 +26,7 @@ class QuestionViewSet(viewsets.ModelViewSet):
     queryset = Question.objects.all()
     serializer_class = QuestionSerializer
 # @api_view(["GET"])
+
 class StudentExamViewSet(viewsets.ViewSet):
 
     @action(detail=True, methods=["get"])
@@ -40,8 +41,8 @@ class StudentExamViewSet(viewsets.ViewSet):
         exam_group = student.exam_groups.all()
 
         # Get all related Subjects (many-to-many)
-        subjects = Subject.objects.filter(exam_groups__in=exam_group)
-
+        subjects = Subject.objects.filter(exam__examgroup__student=student)
+# ExamGroup.objects.filter(exam=exam_group)
         # Get all related Questions under those Subjects
         questions = Question.objects.filter(subject__in=subjects).distinct()
 
@@ -85,7 +86,8 @@ class UploadQuestionsView(APIView):
                     option_b=row['option_b'],
                     option_c=row['option_c'],
                     option_d=row['option_d'],
-                    answer=row['answer'].strip().lower()
+                    answer=row['answer'].strip().lower(),
+                    score = float(row['score'].strip())
                 )
                 created += 1
         return Response({'message': f'{created} questions uploaded successfully.'}, status=status.HTTP_201_CREATED)

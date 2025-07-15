@@ -26,6 +26,7 @@ class StudentLoginAPIView(APIView):
                 "student_id": student.student_id,
                 "first_name": student.first_name,
                 "last_name": student.last_name,
+                "institution": student.institution,
                 "email": student.email,
                 "course": student.course,
                 "is_active": student.is_active,
@@ -33,16 +34,7 @@ class StudentLoginAPIView(APIView):
             }
             return Response({"success": True, "student": response}, status=status.HTTP_200_OK)
 
-            return Response({
-                'success': True,
-                'student_id': student.student_id,
-                'first_name': student.first_name,
-                'last_name': student.last_name,
-                'email': student.email,
-                'course': student.course,
-                'is_active': student.is_active,
-                # "exam_group":student.exam_group,
-            }, status=status.HTTP_200_OK)
+            
         except Student.DoesNotExist:
             return Response({'error': 'Invalid student_id'}, status=status.HTTP_404_NOT_FOUND)
 

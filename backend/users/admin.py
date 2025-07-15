@@ -4,18 +4,18 @@ from django.shortcuts import redirect
 from django.contrib import messages
 from django.template.response import TemplateResponse
 from users.models import Student
-# Register your models here.
+# # Register your models here.
 # admin.site.register(Student)
 
 @admin.register(Student)
 class StudentAdmin(admin.ModelAdmin):
-    list_display = ('student_id', 'first_name', 'last_name', 'email', 'course', 'is_active', 'created_by')
-    search_fields = ('student_id', 'first_name', 'last_name', 'email', 'course')
-    list_filter = ('is_active', 'course', 'gender')
+    list_display = ('student_id', 'first_name', 'last_name', 'email', "institution", 'course', 'is_active', 'created_by')
+    search_fields = ('student_id', 'first_name', 'last_name', 'email', 'course', "institution")
+    list_filter = ('is_active', 'course', 'gender', "institution")
     readonly_fields = ('date_joined', 'updated_at')
     fieldsets = (
         (None, {
-            'fields': ('student_id', 'first_name', 'last_name', 'email', 'phone_number', 'date_of_birth', 'gender', 'course', 'photo', 'is_active', 'created_by', 'date_joined', 'updated_at')
+            'fields': ('student_id', 'first_name', 'last_name', 'email', "institution", 'phone_number', 'date_of_birth', 'gender', 'course', 'photo', 'is_active', 'created_by', 'date_joined')
         }),
     )
 
@@ -26,11 +26,11 @@ class StudentAdmin(admin.ModelAdmin):
         ]
         return custom_urls + urls
 
-    def changelist_view(self, request, extra_context=None):
-        if extra_context is None:
-            extra_context = {}
-        extra_context['messages'] = messages.get_messages(request)
-        return super().changelist_view(request, extra_context=extra_context)
+    # def changelist_view(self, request, extra_context=None):
+    #     if extra_context is None:
+    #         extra_context = {}
+    #     extra_context['messages'] = messages.get_messages(request)
+    #     return super().changelist_view(request, extra_context=extra_context)
 
     def upload_students(self, request, *args, **kwargs):
         from django.contrib.auth.models import User
