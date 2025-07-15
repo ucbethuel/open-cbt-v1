@@ -4,7 +4,7 @@ from institutions.models import Institution
 # Create your models here.
 from django.contrib.auth.models import User
 from django.utils.timezone import now
-from exams.models import Subject
+# from exams.models import Subject
 
 class Student(models.Model):
     student_id = models.CharField(max_length=50, unique=True)
@@ -26,5 +26,5 @@ class Student(models.Model):
     def __str__(self):
         return f"{self.student_id} - {self.first_name} {self.last_name} ({self.course})"
     
-    def get_subjects(self):
-        return Subject.objects.filter(exam__examgroup__student=self)
+    # def get_subjects(self):
+    #     return Subject.objects.filter(exam__examgroup__student=self)

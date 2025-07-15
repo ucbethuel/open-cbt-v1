@@ -230,6 +230,7 @@ const rawStudentData = localStorage.getItem('studentData');
 
   
   // Keyboard Shortcuts
+<<<<<<< HEAD:frontend/src/exam-session.jsx
 useKeyboardShortcuts({
   questions,
   currentQuestionIndex,
@@ -239,6 +240,34 @@ useKeyboardShortcuts({
   handleSubmitExam,
   setSelectedAnswers,
 });
+=======
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      const key = e.key.toUpperCase();
+      const currentQuestion = questions[currentQuestionIndex];
+      if (!currentQuestion) return;
+
+      if (['A', 'B', 'C', 'D'].includes(key)) {
+        handleAnswerSelect(currentQuestion.id, key);
+      } else if (key === 'N') {
+        handleNextQuestion();
+      } else if (key === 'P') {
+        handlePreviousQuestion();
+      } else if (key === 'S') {
+        handleSubmitExam();                 
+      } else if (key === 'R') {
+        setSelectedAnswers((prev) => {
+          const newAnswers = { ...prev };
+          delete newAnswers[currentQuestion.id];
+          return newAnswers;
+        });
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [questions, currentQuestionIndex, selectedAnswers]);
+>>>>>>> c97f2af2480c478f48459fb4f5f40a30706940b4:frontend/src/complete.jsx
 
   // Save progress to backend
   // TODO: Modularise this functions
