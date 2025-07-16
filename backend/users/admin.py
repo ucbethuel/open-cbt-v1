@@ -94,3 +94,9 @@ class StudentAdmin(admin.ModelAdmin):
             )
         )
         return TemplateResponse(request, 'admin/users/student/change_list.html', context)
+
+
+
+admin.site.site_header = "CBT Admin Portal"
+admin.site.site_title = "CBT Management"
+admin.site.index_title = "Welcome to the CBT Admin Panel"
