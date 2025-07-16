@@ -51,6 +51,7 @@ class StudentExamViewSet(viewsets.ViewSet):
         question_data = QuestionSerializer(questions, many=True).data
 
         return Response([{
+            "students_info": student,
             "student_id": student.student_id,
             "subjects": subject_data,
             "questions": question_data
