@@ -26,7 +26,9 @@ const Login = () => {
       const studentData = response.data;
       console.log("Student Data:", response.data);
       localStorage.setItem("studentData", JSON.stringify(studentData));
-      navigate("/exam", { state: { studentData } });
+      console.log('Navigating with studentData:', studentData);
+      console.log('Student ID being passed:', studentData.studentId);
+      navigate("/dashboard", { state: { studentId: studentData.studentId, studentData: studentData } });
     } catch (error) {
       setError("Invalid student ID. Please try again.");
       console.error(error);
