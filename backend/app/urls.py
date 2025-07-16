@@ -46,15 +46,15 @@ urlpatterns = [
 ]
 
 
-# | URL Pattern                   | ViewSet              | Description                               |
-# | ----------------------------- | -------------------- | ----------------------------------------- |
-# | `/api/students/`              | `StudentViewSet`     | Manage students                           |
-# | `/api/exams/`                 | `ExamViewSet`        | Manage exams                              |
-# | `/api/subjects/`              | `SubjectViewSet`     | Manage subjects                           |
-# | `/api/questions/`             | `QuestionViewSet`    | Manage exam questions                     |
-# | `/api/studentexam/<pk>/data/` | `StudentExamViewSet` | Get student-specific exam + question data |
-# | `/api/exam-sessions/`         | `ExamSessionViewSet` | Create/update/fetch exam sessions         |
-# | `/api/answers/`               | `AnswerViewSet`      | Handle answers for sessions               |
+# | URL Pattern                           | ViewSet              | Description                               |
+# | ------------------------------------- | -------------------- | ----------------------------------------- |
+# | `/api/students/`                      | `StudentViewSet`     | Manage students                           |
+# | `/api/exams/`                         | `ExamViewSet`        | Manage exams                              |
+# | `/api/subjects/`                      | `SubjectViewSet`     | Manage subjects                           |
+# | `/api/questions/`                     | `QuestionViewSet`    | Manage exam questions                     |
+# | `/api/studentexam/<student_id>/data/` | `StudentExamViewSet` | Get student-specific exam + question data |
+# | `/api/exam-sessions/`                 | `ExamSessionViewSet` | Create/update/fetch exam sessions         |
+# | `/api/answers/`                       | `AnswerViewSet`      | Handle answers for sessions               |
 
 
 # | URL Pattern          | View                        | Description                    |

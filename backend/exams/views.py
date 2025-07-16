@@ -5,7 +5,8 @@ from django.shortcuts import render
 from rest_framework import viewsets
 from .models import Exam, Subject, Question, ExamGroup
 from users.models import Student
-from .serializers import ExamSerializer, SubjectSerializer, QuestionSerializer, ExamGroupSerializer
+from .serializers import ExamSerializer, SubjectSerializer, QuestionSerializer
+from users.serializers import StudentSerializer
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework.decorators import api_view
@@ -47,11 +48,12 @@ class StudentExamViewSet(viewsets.ViewSet):
         questions = Question.objects.filter(subject__in=subjects).distinct()
 
         # Serialize data
+        student_data = StudentSerializer(student).data
         subject_data = SubjectSerializer(subjects, many=True).data
         question_data = QuestionSerializer(questions, many=True).data
 
         return Response([{
-            "students_info": student,
+            "students_info": student_data,
             "student_id": student.student_id,
             "subjects": subject_data,
             "questions": question_data
