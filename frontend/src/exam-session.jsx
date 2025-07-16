@@ -1,14 +1,11 @@
-import useKeyboardShortcuts from "./hooks/useKeyboardShortcuts";
-import {handleAnswerSelect, handleSubmitExam, handleNextQuestion, handlePreviousQuestion} from "./helpers/keyboardShortcode";
-import handleCalculatorOperation from "./helpers/calculator";
-import bootstrapStyle from "./styles/bootstrapStyle";
+
+
 import React, { useState, useEffect, useRef } from 'react';
 import { useLocation } from 'react-router-dom';
 import ProgressBar from './components/progressBar'; 
-import CONFIG from './config'; // Assuming you have a config file for constants
+import bootstrapStyle from "./styles/bootstrapStyle";
 
 const Exam = () => {
-  // CONFIG = CONFIG;
   // Configuration - Easy to modify
   let CONFIG = {
     EXAM_DURATION: 7200, // 2 hours in seconds
@@ -23,18 +20,27 @@ const Exam = () => {
     ],
     AUTO_SAVE_INTERVAL: 30000 // Auto-save every 30 seconds
   };
+
+  const location = useLocation();
+  const studentId = location.state?.studentId || 'GUEST';
   
+  // Get student data from localStorage or use default
+  const getStudentData = () => {
+    try {
+      const rawStudentData = localStorage.getItem('studentData');
+      return rawStudentData ? JSON.parse(rawStudentData) : { first_name: 'Guest', last_name: 'User' };
+    } catch (error) {
+      console.error('Error parsing student data:', error);
+      return { first_name: 'Guest', last_name: 'User' };
+    }
+  };
 
-const location = useLocation();
-const studentId = location.state?.studentId || 'GUEST';
-// console.log(studentId.student_id)
-const rawStudentData = localStorage.getItem('studentData');
-  const studentData = rawStudentData ? JSON.parse(rawStudentData) : null;
+  const studentData = getStudentData();
 
-  // Student Information - Will come from authentication
+  // Student Information
   const [studentInfo] = useState({
     name: studentData.first_name + " " + studentData.last_name,
-    studentId: studentId, // Replace with actual student ID
+    studentId: studentId,
     examId: 'CBT_2025_001',
     course: 'JAMB CBT Examination'
   });
@@ -55,49 +61,63 @@ const rawStudentData = localStorage.getItem('studentData');
   const [calculatorValue, setCalculatorValue] = useState('0');
   const [isCalculatorMinimized, setIsCalculatorMinimized] = useState(false);
 
-
   // Refs
   const dragRef = useRef({ isDragging: false, startX: 0, startY: 0 });
   const autoSaveRef = useRef();
 
-  // API Functions
-  const apiCall = async (endpoint, options = {}) => {
-    try {
-      const response = await fetch(`${CONFIG.API_BASE_URL}${endpoint}`, {
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${window.authToken || 'demo-token'}`,
-          ...options.headers
-        },
-        ...options
-      });
+  // Handler functions - Define these before using them
+  const handleAnswerSelect = (questionId, answerId) => {
+    setSelectedAnswers(prev => ({
+      ...prev,
+      [questionId]: answerId
+    }));
+  };
 
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
-
-      return await response.json();
-    } catch (error) {
-      console.error('API call failed:', error);
-      throw error;
+  const handleNextQuestion = () => {
+    if (currentQuestionIndex < questions.length - 1) {
+      setCurrentQuestionIndex(prev => prev + 1);
     }
   };
 
- 
-  // Load questions for selected subject
-  const loadQuestions = async (subjectId) => {
-    setLoading(true);
-    setError(null);
-    
-    try {
-      const mockQuestions = await getMockQuestions(subjectId);
-      setQuestions(mockQuestions);
-    } catch (err) {
-      setError(`Failed to load questions: ${err.message}`);
-      setQuestions([]);
-    } finally {
-      setLoading(false);
+  const handlePreviousQuestion = () => {
+    if (currentQuestionIndex > 0) {
+      setCurrentQuestionIndex(prev => prev - 1);
     }
+  };
+
+  const handleSubmitExam = () => {
+    const confirmed = window.confirm('Are you sure you want to submit the exam?');
+    if (confirmed) {
+      submitExam();
+    }
+  };
+
+  // Calculator operation handler
+  const handleCalculatorOperation = (operation) => {
+    setCalculatorValue(prev => {
+      try {
+        switch (operation) {
+          case 'C':
+            return '0';
+          case 'CE':
+            return '0';
+          case '=':
+            // Simple evaluation - in production, use a proper math parser
+            return String(eval(prev.replace(/[^0-9+\-*/.]/g, '')));
+          case '+':
+          case '-':
+          case '*':
+          case '/':
+            return prev + operation;
+          case '.':
+            return prev.includes('.') ? prev : prev + '.';
+          default:
+            return prev === '0' ? operation : prev + operation;
+        }
+      } catch (error) {
+        return 'Error';
+      }
+    });
   };
 
   // Mock function - Replace with actual API call
@@ -185,6 +205,22 @@ const rawStudentData = localStorage.getItem('studentData');
     return questionSets[subjectId] || [];
   };
 
+  // Load questions for selected subject
+  const loadQuestions = async (subjectId) => {
+    setLoading(true);
+    setError(null);
+    
+    try {
+      const mockQuestions = await getMockQuestions(subjectId);
+      setQuestions(mockQuestions);
+    } catch (err) {
+      setError(`Failed to load questions: ${err.message}`);
+      setQuestions([]);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   // Utility functions
   const formatTime = (seconds) => {
     const hours = Math.floor(seconds / 3600);
@@ -192,8 +228,6 @@ const rawStudentData = localStorage.getItem('studentData');
     const secs = seconds % 60;
     return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
   };
-
-  
 
   const toggleFlagQuestion = () => {
     if (!questions[currentQuestionIndex]) return;
@@ -216,8 +250,6 @@ const rawStudentData = localStorage.getItem('studentData');
     }
   };
 
-  
-
   const getQuestionStatusClass = (index) => {
     if (!questions[index]) return 'btn-secondary';
     
@@ -228,49 +260,7 @@ const rawStudentData = localStorage.getItem('studentData');
     return 'btn-danger';
   };
 
-  
-  // Keyboard Shortcuts
-<<<<<<< HEAD:frontend/src/exam-session.jsx
-useKeyboardShortcuts({
-  questions,
-  currentQuestionIndex,
-  handleAnswerSelect,
-  handleNextQuestion,
-  handlePreviousQuestion,
-  handleSubmitExam,
-  setSelectedAnswers,
-});
-=======
-  useEffect(() => {
-    const handleKeyDown = (e) => {
-      const key = e.key.toUpperCase();
-      const currentQuestion = questions[currentQuestionIndex];
-      if (!currentQuestion) return;
-
-      if (['A', 'B', 'C', 'D'].includes(key)) {
-        handleAnswerSelect(currentQuestion.id, key);
-      } else if (key === 'N') {
-        handleNextQuestion();
-      } else if (key === 'P') {
-        handlePreviousQuestion();
-      } else if (key === 'S') {
-        handleSubmitExam();                 
-      } else if (key === 'R') {
-        setSelectedAnswers((prev) => {
-          const newAnswers = { ...prev };
-          delete newAnswers[currentQuestion.id];
-          return newAnswers;
-        });
-      }
-    };
-
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [questions, currentQuestionIndex, selectedAnswers]);
->>>>>>> c97f2af2480c478f48459fb4f5f40a30706940b4:frontend/src/complete.jsx
-
   // Save progress to backend
-  // TODO: Modularise this functions
   const saveProgress = async () => {
     try {
       const progressData = {
@@ -291,7 +281,6 @@ useKeyboardShortcuts({
   };
 
   // Load saved progress
-  // TODO: Modularise this functions
   const loadProgress = async () => {
     try {
       // Mock implementation
@@ -301,7 +290,6 @@ useKeyboardShortcuts({
   };
 
   // Submit exam
-  // TODO: Modularise this functions
   const submitExam = async () => {
     try {
       const submissionData = {
@@ -321,17 +309,59 @@ useKeyboardShortcuts({
   };
 
   // Handle subject change
-  // TODO: Modularise this functions
   const handleSubjectChange = (index) => {
     setCurrentSubject(index);
     setCurrentQuestionIndex(0);
-    setSelectedAnswers({});
+    // setSelectedAnswers({});
     setFlaggedQuestions(new Set());
     loadQuestions(CONFIG.SUBJECTS[index].id);
   };
 
+  // Keyboard shortcuts effect - Fixed to use proper dependencies
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      // Prevent default behavior for our shortcuts
+      const key = e.key.toUpperCase();
+      const currentQuestion = questions[currentQuestionIndex];
+      
+      if (!currentQuestion) return;
 
-  
+      // Prevent default for our specific keys
+      if (['A', 'B', 'C', 'D', 'N', 'P', 'S', 'R'].includes(key)) {
+        e.preventDefault();
+      }
+
+      switch (key) {
+        case 'A':
+        case 'B':
+        case 'C':
+        case 'D':
+          handleAnswerSelect(currentQuestion.id, key);
+          break;
+        case 'N':
+          handleNextQuestion();
+          break;
+        case 'P':
+          handlePreviousQuestion();
+          break;
+        case 'S':
+          handleSubmitExam();
+          break;
+        case 'R':
+          setSelectedAnswers((prev) => {
+            const newAnswers = { ...prev };
+            delete newAnswers[currentQuestion.id];
+            return newAnswers;
+          });
+          break;
+        default:
+          break;
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [questions, currentQuestionIndex]); // Removed selectedAnswers from dependencies
 
   // Timer effect
   useEffect(() => {
@@ -369,9 +399,7 @@ useKeyboardShortcuts({
     loadQuestions(CONFIG.SUBJECTS[currentSubject].id);
   }, []);
 
-  const progress = questions.length > 0 ? (Object.keys(selectedAnswers).length / questions.length * 100) : 0;
-
-
+  // Calculator drag handlers
   const handleMouseDown = (e) => {
     dragRef.current.isDragging = true;
     dragRef.current.startX = e.clientX - calculatorPosition.x;
@@ -434,9 +462,7 @@ useKeyboardShortcuts({
 
   const currentQuestion = questions[currentQuestionIndex];
 
-
-
-  // Render Logic.
+  // Render Logic
   return (
     <>
       <style>{bootstrapStyle}</style>
@@ -529,11 +555,12 @@ useKeyboardShortcuts({
                               <div
                                 key={option.id}
                                 onClick={() => handleAnswerSelect(currentQuestion.id, option.id)}
-                                className={`answer-option p-3 border rounded mb-2 ${
+                                className={`answer-option p-3 border rounded mb-2 cursor-pointer ${
                                   selectedAnswers[currentQuestion.id] === option.id
-                                    ? 'selected border-primary'
+                                    ? 'selected border-primary bg-primary bg-opacity-10'
                                     : 'border-secondary'
                                 }`}
+                                style={{ cursor: 'pointer' }}
                               >
                                 <div className="d-flex align-items-center">
                                   <div className={`me-3 ${
@@ -631,10 +658,8 @@ useKeyboardShortcuts({
 
                           {/* Progress Bar */}
                           <div className="mb-3">
-                            <ProgressBar  />
-
+                            <ProgressBar />
                           </div>
-
                         </div>
                       </div>
                     </div>
@@ -653,16 +678,16 @@ useKeyboardShortcuts({
                       <h6 className="mb-0">{studentInfo.name}</h6>
                       <small className="text-muted">ID: {studentInfo.studentId}</small>
                     </div>
-                    
                   </div>
-                   {/* Calculator Toggle */}
-                          <button
-                            onClick={() => setIsCalculatorVisible(!isCalculatorVisible)}
-                            className="btn btn-outline-secondary w-100"
-                          >
-                            <i className="fas fa-calculator me-2"></i>
-                            {isCalculatorVisible ? 'Hide Calculator' : 'Show Calculator'}
-                          </button>
+                  
+                  {/* Calculator Toggle */}
+                  <button
+                    onClick={() => setIsCalculatorVisible(!isCalculatorVisible)}
+                    className="btn btn-outline-secondary w-100 mb-3"
+                  >
+                    <i className="fas fa-calculator me-2"></i>
+                    {isCalculatorVisible ? 'Hide Calculator' : 'Show Calculator'}
+                  </button>
 
                   <div className="row g-3">
                     <div className="col-12">
@@ -684,7 +709,6 @@ useKeyboardShortcuts({
                           <h6 className="card-title">Exam Status</h6>
                           <div className="small text-muted">
                             <p className="mb-1">Time Used: {formatTime(CONFIG.EXAM_DURATION - timeRemaining)}</p>
-                            {/* <p className="mb-1">Auto-saving: <span className="text-success">Active</span></p> */}
                             <p className="mb-0">Connection: <span className="text-success">Stable</span></p>
                           </div>
                         </div>
@@ -701,7 +725,7 @@ useKeyboardShortcuts({
                             <li className="mb-1">• Calculator available when needed</li>
                             <li className="mb-1">• Auto-save every 30 seconds</li>
                             <li className="mb-1">• Press 'S' to submit exam</li>
-                                                        <li className="mb-1">• Press 'N' for next, 'P' for previous</li>
+                            <li className="mb-1">• Press 'N' for next, 'P' for previous</li>
                             <li className="mb-1">• Press 'R' to clear selected option</li>
                           </ul>
                         </div>
@@ -709,15 +733,12 @@ useKeyboardShortcuts({
                     </div>
 
                     <div className="col-12">
-                      <div className="d-flex justify-content-between">
-                      
-                        <button
-                          onClick={handleSubmitExam}
-                          className="btn btn-primary w-50"
-                        >
-                          <i className="fas fa-paper-plane me-2"></i>Submit Exam
-                        </button>
-                      </div>
+                      <button
+                        onClick={handleSubmitExam}
+                        className="btn btn-primary w-100"
+                      >
+                        <i className="fas fa-paper-plane me-2"></i>Submit Exam
+                      </button>
                     </div>
                   </div>
                 </div>
@@ -729,18 +750,20 @@ useKeyboardShortcuts({
         {/* Calculator Component */}
         {isCalculatorVisible && (
           <div
-            className="calculator"
+            className="calculator position-fixed bg-white border shadow-lg rounded"
             style={{
               left: `${calculatorPosition.x}px`,
               top: `${calculatorPosition.y}px`,
-              width: isCalculatorMinimized ? '200px' : '280px'
+              width: isCalculatorMinimized ? '200px' : '280px',
+              zIndex: 1000
             }}
             onMouseMove={handleMouseMove}
             onMouseUp={handleMouseUp}
           >
             <div
-              className="calculator-header d-flex justify-content-between align-items-center p-2"
+              className="calculator-header d-flex justify-content-between align-items-center p-2 bg-light border-bottom"
               onMouseDown={handleMouseDown}
+              style={{ cursor: 'move' }}
             >
               <span className="fw-bold">Calculator</span>
               <div className="btn-group">
@@ -774,8 +797,8 @@ useKeyboardShortcuts({
                     {['C', 'CE', '/', '*'].map(btn => (
                       <div key={btn} className="col-3">
                         <button
-                          className="btn btn-outline-danger w-100"
                           onClick={() => handleCalculatorOperation(btn)}
+                          className="btn btn-outline-secondary w-100"
                         >
                           {btn}
                         </button>
@@ -784,8 +807,8 @@ useKeyboardShortcuts({
                     {['7', '8', '9', '-'].map(btn => (
                       <div key={btn} className="col-3">
                         <button
-                          className="btn btn-outline-secondary w-100"
                           onClick={() => handleCalculatorOperation(btn)}
+                          className="btn btn-outline-secondary w-100"
                         >
                           {btn}
                         </button>
@@ -794,8 +817,8 @@ useKeyboardShortcuts({
                     {['4', '5', '6', '+'].map(btn => (
                       <div key={btn} className="col-3">
                         <button
-                          className="btn btn-outline-secondary w-100"
                           onClick={() => handleCalculatorOperation(btn)}
+                          className="btn btn-outline-secondary w-100"
                         >
                           {btn}
                         </button>
@@ -804,8 +827,8 @@ useKeyboardShortcuts({
                     {['1', '2', '3'].map(btn => (
                       <div key={btn} className="col-3">
                         <button
-                          className="btn btn-outline-secondary w-100"
                           onClick={() => handleCalculatorOperation(btn)}
+                          className="btn btn-outline-secondary w-100"
                         >
                           {btn}
                         </button>
@@ -813,38 +836,33 @@ useKeyboardShortcuts({
                     ))}
                     <div className="col-3">
                       <button
-                        className="btn btn-primary w-100 h-100"
-                        style={{ height: 'calc(100% + 42px)' }}
                         onClick={() => handleCalculatorOperation('=')}
+                        className="btn btn-primary w-100"
                       >
                         =
                       </button>
                     </div>
-                    <div className="col-6">
-                      <button
-                        className="btn btn-outline-secondary w-100"
-                        onClick={() => handleCalculatorOperation('0')}
-                      >
-                        0
-                      </button>
-                    </div>
-                    <div className="col-3">
-                      <button
-                        className="btn btn-outline-secondary w-100"
-                        onClick={() => handleCalculatorOperation('.')}
-                      >
-                        .
-                      </button>
-                    </div>
+                    {['0', '.'].map(btn => (
+                      <div key={btn} className="col-6">
+                        <button
+                          onClick={() => handleCalculatorOperation(btn)}
+                          className="btn btn-outline-secondary w-100"
+                        >
+                          {btn}
+                        </button>
+                      </div>
+                    ))}
                   </div>
-                </div>
-              </>
-            )}
-          </div>
-        )}
+                 </div>
+            </>
+          )}
+        </div>
+      )}
       </div>
+
+      {/* Global styles */}
     </>
   );
-};
+}
 
 export default Exam;
