@@ -23,6 +23,10 @@ class Student(models.Model):
     updated_at = models.DateTimeField(auto_now=True)
     created_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True)  # admin who added
 
+    @property
+    def is_authenticated(self):
+        return True
+
     def __str__(self):
         return f"{self.student_id} - {self.first_name} {self.last_name} ({self.course})"
     
