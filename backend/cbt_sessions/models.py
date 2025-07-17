@@ -16,6 +16,10 @@ class ExamSession(models.Model):
     flagged_questions = models.ManyToManyField(Question, related_name='flagged_in_sessions', blank=True)
     completed = models.BooleanField(default=False)
 
+    class Meta:
+        unique_together = ('student', 'exam')
+
+
     def save(self, *args, **kwargs):
         if self.ended_at and self.started_at:
             self.duration = self.ended_at - self.started_at

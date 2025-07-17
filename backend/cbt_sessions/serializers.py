@@ -76,12 +76,14 @@ class ExamSessionSerializer(serializers.ModelSerializer):
             'completed',
             'answers'
         ]
+        extra_kwargs = {
+            'student': {'read_only': True}
+        }
 
     def get_subject(self, obj):
         return str(obj.exam.subject)
-    
+
     def get_questions(self, obj):
-        # Get questions from the subject linked to the exam
         questions = Question.objects.filter(subject=obj.exam.subject)
         return QuestionSerializer(questions, many=True).data
 
@@ -109,29 +111,30 @@ class ExamSessionUpdateSerializer(serializers.ModelSerializer):
         }
 
     def update(self, instance, validated_data):
-        # Update session core fields
+        # Update core fields
         for field in ['time_remaining', 'current_question', 'completed', 'ended_at']:
             if field in validated_data:
                 setattr(instance, field, validated_data[field])
 
-        # Handle flagged questions
         if 'flagged_questions' in validated_data:
             instance.flagged_questions.set(validated_data['flagged_questions'])
 
         instance.save()
 
-        # Process answers if provided
+        # Handle answer saving
         answers_data = validated_data.get('answers', [])
         for answer_data in answers_data:
-            question = answer_data['question']
-            selected_option = answer_data.get('selected_option')
+            question_id = answer_data['question']
+            try:
+                question = Question.objects.get(id=question_id)
+            except Question.DoesNotExist:
+                raise serializers.ValidationError(f"Question with ID {question_id} does not exist.")
 
-            # Compute correctness and grade
+            selected_option = answer_data.get('selected_option')
             correct_option = question.answer
             is_correct = selected_option == correct_option
             awarded_grade = question.score if is_correct else 0.00
 
-            # Create or update answer
             Answer.objects.update_or_create(
                 session=instance,
                 question=question,
