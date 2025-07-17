@@ -40,6 +40,9 @@ class StudentExamViewSet(viewsets.ViewSet):
             }, status=404)
         # Get all ExamGroup the student is part of
         exam_group = student.exam_groups.all()
+        
+        # Get all related Exams through ExamGroups
+        exams = Exam.objects.filter(examgroup__in=exam_group).distinct()
 
         # Get all related Subjects (many-to-many)
         subjects = Subject.objects.filter(exam__examgroup__student=student)
@@ -49,11 +52,15 @@ class StudentExamViewSet(viewsets.ViewSet):
 
         # Serialize data
         student_data = StudentSerializer(student).data
+        exam_data = ExamSerializer(exams, many=True).data
+        if not exam_data:
+            exam_data = None
         subject_data = SubjectSerializer(subjects, many=True).data
         question_data = QuestionSerializer(questions, many=True).data
 
         return Response([{
             "students_info": student_data,
+            "exam_info": exam_data,
             "student_id": student.student_id,
             "subjects": subject_data,
             "questions": question_data
