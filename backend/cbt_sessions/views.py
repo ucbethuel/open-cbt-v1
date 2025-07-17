@@ -47,6 +47,11 @@ class ExamSessionViewSet(viewsets.ModelViewSet):
 
     def partial_update(self, request, *args, **kwargs):
         instance = self.get_object()
+
+        # Security check: ensure the session belongs to the authenticated user
+        if instance.student != request.user:
+            raise PermissionDenied("You do not have permission to update this exam session.")
+
         serializer = self.get_serializer(instance, data=request.data, partial=True)
         serializer.is_valid(raise_exception=True)
         self.perform_update(serializer)
@@ -61,7 +66,7 @@ class AnswerViewSet(viewsets.ModelViewSet):
         return Answer.objects.filter(session__student=self.request.user)
 
     def perform_create(self, serializer):
-        session = serializer.validated_data['session']
-        if session.student != self.request.user:
-            raise PermissionDenied("Unauthorized session.")
+        session = serializer.validated_data.get('session')
+        if session and session.student != self.request.user:
+            raise PermissionDenied("You are not allowed to submit an answer for this session.")
         serializer.save()

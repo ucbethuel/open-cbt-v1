@@ -4,7 +4,6 @@ from django.contrib import messages
 from django.shortcuts import redirect
 from django.template.response import TemplateResponse
 import pandas as pd
-from exams.views import UploadQuestionsView
 from .models import Exam, Subject, Question, ExamGroup
 
 # Register your models here.

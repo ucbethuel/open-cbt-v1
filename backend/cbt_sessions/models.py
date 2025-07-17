@@ -30,7 +30,7 @@ class ExamSession(models.Model):
         self.save()
 
     def __str__(self):
-        return f"{self.student} - {self.exam}"
+        return f"{self.pk} - {self.student} - {self.exam}"
 
 class Answer(models.Model):
     session = models.ForeignKey(ExamSession, related_name='answers', on_delete=models.CASCADE)

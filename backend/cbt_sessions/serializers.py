@@ -1,13 +1,17 @@
+import logging
 from rest_framework import serializers
 from .models import ExamSession, Answer
 from exams.models import Question
 from exams.serializers import QuestionSerializer
+
+logger = logging.getLogger(__name__)
 
 
 class AnswerSerializer(serializers.ModelSerializer):
     question_text = serializers.CharField(source='question.text', read_only=True)
     subject_id = serializers.IntegerField(source='question.subject.id', read_only=True)
     choices = serializers.SerializerMethodField()
+    session = serializers.PrimaryKeyRelatedField(read_only=True)
 
     class Meta:
         model = Answer
@@ -36,9 +40,6 @@ class AnswerSerializer(serializers.ModelSerializer):
             'question_text',
             'subject_id'
         ]
-        extra_kwargs = {
-            'session': {'read_only': True}
-        }
 
     def get_choices(self, obj):
         return {
@@ -66,7 +67,7 @@ class ExamSessionSerializer(serializers.ModelSerializer):
             'student',
             'exam',
             'subject',
-            "questions",
+            'questions',
             'started_at',
             'ended_at',
             'time_remaining',
@@ -111,7 +112,7 @@ class ExamSessionUpdateSerializer(serializers.ModelSerializer):
         }
 
     def update(self, instance, validated_data):
-        # Update core fields
+        # Update basic fields
         for field in ['time_remaining', 'current_question', 'completed', 'ended_at']:
             if field in validated_data:
                 setattr(instance, field, validated_data[field])
@@ -121,21 +122,22 @@ class ExamSessionUpdateSerializer(serializers.ModelSerializer):
 
         instance.save()
 
-        # Handle answer saving
+        # Handle answer updates
         answers_data = validated_data.get('answers', [])
+        logger.info(f"Patching {len(answers_data)} answers for session {instance.id}")
+
         for answer_data in answers_data:
-            question_id = answer_data['question']
-            try:
-                question = Question.objects.get(id=question_id)
-            except Question.DoesNotExist:
-                raise serializers.ValidationError(f"Question with ID {question_id} does not exist.")
+            question = answer_data['question']
+
+            # Inject session to avoid serializer complaining
+            answer_data['session'] = instance
 
             selected_option = answer_data.get('selected_option')
             correct_option = question.answer
             is_correct = selected_option == correct_option
             awarded_grade = question.score if is_correct else 0.00
 
-            Answer.objects.update_or_create(
+            obj, created = Answer.objects.update_or_create(
                 session=instance,
                 question=question,
                 defaults={
@@ -149,5 +151,6 @@ class ExamSessionUpdateSerializer(serializers.ModelSerializer):
                     'grade': answer_data.get('grade'),
                 }
             )
+            logger.info(f"{'Created' if created else 'Updated'} answer with id={obj.id}")
 
         return instance
