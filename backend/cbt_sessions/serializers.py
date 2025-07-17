@@ -1,6 +1,7 @@
 from rest_framework import serializers
 from .models import ExamSession, Answer
 from exams.models import Question
+from exams.serializers import QuestionSerializer
 
 
 class AnswerSerializer(serializers.ModelSerializer):
@@ -56,6 +57,7 @@ class AnswerSerializer(serializers.ModelSerializer):
 class ExamSessionSerializer(serializers.ModelSerializer):
     answers = AnswerSerializer(many=True, read_only=True)
     subject = serializers.SerializerMethodField()
+    questions = serializers.SerializerMethodField()
 
     class Meta:
         model = ExamSession
@@ -64,6 +66,7 @@ class ExamSessionSerializer(serializers.ModelSerializer):
             'student',
             'exam',
             'subject',
+            "questions",
             'started_at',
             'ended_at',
             'time_remaining',
@@ -76,6 +79,11 @@ class ExamSessionSerializer(serializers.ModelSerializer):
 
     def get_subject(self, obj):
         return str(obj.exam.subject)
+    
+    def get_questions(self, obj):
+        # Get questions from the subject linked to the exam
+        questions = Question.objects.filter(subject=obj.exam.subject)
+        return QuestionSerializer(questions, many=True).data
 
 
 class ExamSessionUpdateSerializer(serializers.ModelSerializer):

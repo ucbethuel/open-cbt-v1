@@ -19,7 +19,7 @@ class ExamSession(models.Model):
     def save(self, *args, **kwargs):
         if self.ended_at and self.started_at:
             self.duration = self.ended_at - self.started_at
-        super.save(*args, **kwargs)
+        super().save(*args, **kwargs)
     
     def mark_as_ended(self):
         self.ended_at = timezone.now()
