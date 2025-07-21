@@ -2,8 +2,8 @@
 import React from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
 import Login from './Login';
-import ExamSession from './realexam-session';
-// import Exam from './exam-session';
+// import ExamSession from './realexam-session';
+import ExamSession from './exam-session';
 import Dashboard from './Dashboard';
 import ExamComplete from './ExamComplete';
 
