@@ -2,8 +2,12 @@
 import React from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
 import Login from './Login';
-import Exam from './exam-session';
+import ExamSession from './realexam-session';
+// import Exam from './exam-session';
 import Dashboard from './Dashboard';
+import ExamComplete from './ExamComplete';
+
+
 
 // import Exam from './complete';
 import AdminDashboard from './Admin/Cctexam/AdminDashboard'; 
@@ -20,12 +24,14 @@ const App = () => {
       <Route path="/" element={<Navigate to="/login" replace />} />
       
       <Route path="/login" element={<Login />} />
-      <Route path="/exam" element={<Exam />} />
-      <Route path="/exam-session" element={<Exam />} />
+      {/* <Route path="/exam" element={<Exam/>} /> */}
+      <Route path="/exam-session" element={<ExamSession />} />
+      <Route path="/exam-complete" element={<ExamComplete />} />
       <Route path="/dashboard" element={<Dashboard />} />
+
       {/* Admin routes */}
       <Route path="/admindashboard" element={<AdminLogin />} />
-      <Route path="/complete" element={<Exam />} />
+      {/* <Route path="/complete" element={<Exam />} /> */}
       <Route path="/admindashboard/cct" element={<AdminDashboard />} />
       <Route path="/jambadmindashboard" element={<CbtAdminDashboard />} />
       <Route path="/registerstudent" element={<StudentRegister />} />
