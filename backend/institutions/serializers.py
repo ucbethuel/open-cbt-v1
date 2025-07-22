@@ -5,4 +5,4 @@ from institutions.models import Institution
 class InstitutionalSerializers(serializers.ModelSerializer):
     class Meta:
         model = Institution
-        fields = ('name', 'address', 'logo')
+        fields = "__all__"

@@ -1,0 +1,24 @@
+{% load static %}
+<div>
+  <style>
+    #webcam-stream {
+      border: 2px solid #ccc;
+      margin-bottom: 10px;
+    }
+    #capture-photo{
+       width: 10em;
+       height: 2em;
+    }
+  </style>
+
+  <video id="webcam-stream" autoplay playsinline width="300" height="225"></video><br>
+  <button type="button" id="capture-photo">Take Photo</button>
+  <br><br>
+
+  <input type="file" name="{{ widget.name }}" id="photo-upload" {% include "django/forms/widgets/attrs.html" %}>
+
+  {% if widget.value %}
+    <p>Current Photo:</p>
+    <img src="{{ widget.value.url }}" alt="Current Photo" width="150">
+  {% endif %}
+</div>

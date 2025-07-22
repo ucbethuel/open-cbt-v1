@@ -21,6 +21,9 @@ from rest_framework import routers
 from users.views import StudentViewSet
 from exams.views import ExamViewSet, StudentExamViewSet, SubjectViewSet, QuestionViewSet
 from cbt_sessions.views import ExamSessionViewSet, AnswerViewSet
+from django.conf import settings
+from django.conf.urls.static import static
+
 
 router = routers.DefaultRouter()
 # Students
@@ -44,6 +47,8 @@ urlpatterns = [
     # path('api/cbt/', include('cbt_sessions.urls')),  # for any custom cbt endpoints
     # path("api/", include("exam.urls")), path("docs", include_docs_urls(title="My API Docs"))
 ]
+if settings.DEBUG:
+    urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
 
 
 # | URL Pattern                           | ViewSet              | Description                               |

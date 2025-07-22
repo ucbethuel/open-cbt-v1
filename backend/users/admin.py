@@ -3,16 +3,32 @@ from django.urls import path
 from django.shortcuts import redirect
 from django.contrib import messages
 from django.template.response import TemplateResponse
+from django import forms
 from users.models import Student
-# # Register your models here.
-# admin.site.register(Student)
+
+class WebcamCaptureWidget(forms.ClearableFileInput):
+    template_name = 'admin/webcam_capture_widget.html'
+
+    class Media:
+        js = ('js/webcam_capture.js',)
+
+class StudentAdminForm(forms.ModelForm):
+    class Meta:
+        model = Student
+        fields = '__all__'
+        widgets = {
+            'photo': WebcamCaptureWidget,
+        }
 
 @admin.register(Student)
 class StudentAdmin(admin.ModelAdmin):
+    form = StudentAdminForm
+
     list_display = ('student_id', 'first_name', 'last_name', 'email', "institution", 'course', 'is_active', 'created_by')
     search_fields = ('student_id', 'first_name', 'last_name', 'email', 'course', "institution")
     list_filter = ('is_active', 'course', 'gender', "institution")
     readonly_fields = ('date_joined', 'updated_at')
+
     fieldsets = (
         (None, {
             'fields': ('student_id', 'first_name', 'last_name', 'email', "institution", 'phone_number', 'date_of_birth', 'gender', 'course', 'photo', 'is_active', 'created_by', 'date_joined')
@@ -26,14 +42,7 @@ class StudentAdmin(admin.ModelAdmin):
         ]
         return custom_urls + urls
 
-    # def changelist_view(self, request, extra_context=None):
-    #     if extra_context is None:
-    #         extra_context = {}
-    #     extra_context['messages'] = messages.get_messages(request)
-    #     return super().changelist_view(request, extra_context=extra_context)
-
     def upload_students(self, request, *args, **kwargs):
-        from django.contrib.auth.models import User
         if request.method == 'POST' and 'students_file' in request.FILES:
             file = request.FILES['students_file']
             try:
@@ -96,7 +105,6 @@ class StudentAdmin(admin.ModelAdmin):
         return TemplateResponse(request, 'admin/users/student/change_list.html', context)
 
 
-
-admin.site.site_header = "CBT Admin Portal"
-admin.site.site_title = "CBT Management"
+admin.site.site_header = "Open CBT Admin Dashboard"
+admin.site.site_title = "Open CBT Management"
 admin.site.index_title = "Welcome to the CBT Admin Panel"
