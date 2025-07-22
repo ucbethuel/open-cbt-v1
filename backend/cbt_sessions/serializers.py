@@ -1,5 +1,7 @@
 import logging
 from rest_framework import serializers
+
+from institutions.serializers import InstitutionalSerializers
 from .models import ExamSession, Answer
 from exams.models import Question
 from exams.serializers import QuestionSerializer
@@ -59,12 +61,15 @@ class ExamSessionSerializer(serializers.ModelSerializer):
     answers = AnswerSerializer(many=True, read_only=True)
     subject = serializers.SerializerMethodField()
     questions = serializers.SerializerMethodField()
+    institution = InstitutionalSerializers(source='student.institution', read_only=True)
+
 
     class Meta:
         model = ExamSession
         fields = [
             'id',
             'student',
+            'institution',
             'exam',
             'subject',
             'questions',

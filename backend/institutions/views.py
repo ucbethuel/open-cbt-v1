@@ -1,23 +1,9 @@
-from django.shortcuts import render
+# institutions/views.py
 
-# Create your views here.
-
-# views.py
-from rest_framework.response import Response
-from .models import Institution, Student
+from rest_framework import viewsets
+from .models import Institution
 from .serializers import InstitutionSerializer
 
-def student_login_view(request):
-    student_id = request.GET.get("student_id")
-    student = Student.objects.get(student_id=student_id)
-    
-    institution = student.institution  # Assuming ForeignKey to Institution
-
-    # Serialize the institution
-    serialized_institution = InstitutionSerializer(institution).data
-
-    return Response({
-        "student_id": student.student_id,
-        "institution": serialized_institution,
-    })
-
+class InstitutionViewSet(viewsets.ModelViewSet):
+    queryset = Institution.objects.all()
+    serializer_class = InstitutionSerializer

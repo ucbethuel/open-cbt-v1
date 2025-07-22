@@ -30,40 +30,6 @@ class StudentLoginAPIView(APIView):
         
         except Student.DoesNotExist:
             return Response({'error': 'Invalid student_id'}, status=status.HTTP_404_NOT_FOUND)
-        
-
-    # def post(self, request):
-    #     student_id = request.data.get('student_id')
-    #     if not student_id:
-    #         return Response({'error': 'student_id is required'}, status=status.HTTP_400_BAD_REQUEST)
-    #     try:
-    #         student = Student.objects.get(student_id=student_id)
-    #         # You can return student info or just a success message
-    #         response = {
-    #             "id": student.pk,
-    #             "student_id": student.student_id,
-    #             "first_name": student.first_name,
-    #             "last_name": student.last_name,
-    #             "email": student.email,
-    #             "course": student.course,
-    #             "is_active": student.is_active,
-    #             "exam_groups": [group.name for group in student.exam_groups.all()],
-    #         }
-    #         return Response({"success": True, "student": response}, status=status.HTTP_200_OK)
-
-            # return Response({
-            #     'success': True,
-            #     "id": student.pk,
-            #     'student_id': student.student_id,
-            #     'first_name': student.first_name,
-            #     'last_name': student.last_name,
-            #     'email': student.email,
-            #     'course': student.course,
-            #     'is_active': student.is_active,
-            #     "exam_group": student.exam_groups,
-            # }, status=status.HTTP_200_OK)
-        except Student.DoesNotExist:
-            return Response({'error': 'Invalid student_id'}, status=status.HTTP_404_NOT_FOUND)
 
 
 class StudentBatchUploadAPIView(APIView):
