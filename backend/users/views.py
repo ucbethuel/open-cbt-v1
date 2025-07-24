@@ -27,10 +27,9 @@ class StudentLoginAPIView(APIView):
             student = Student.objects.get(student_id=student_id)
             # Block login if student is not active (e.g., after submission)
             if not student.is_active:
-                return Response({'error': 'This student is not permitted to login. Please contact admin.'}, status=status.HTTP_403_FORBIDDEN)
+            return Response({'error': 'This student is not permitted to login. Please contact admin.'}, status=status.HTTP_403_FORBIDDEN)
             serializer = StudentSerializer(student, context={'request': request})
             return Response({"success": True, "student": serializer.data}, status=status.HTTP_200_OK)
-
         except Student.DoesNotExist:
             return Response({'error': 'Invalid student_id'}, status=status.HTTP_404_NOT_FOUND)
 
