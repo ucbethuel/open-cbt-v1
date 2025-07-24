@@ -1,4 +1,6 @@
 
+
+
 import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 
@@ -15,18 +17,34 @@ const ExamSession = () => {
   const navigate = useNavigate();
   
   // Get student data from localStorage
+  // Helper to clear all exam-related localStorage (except student info) on new session/student
+  const clearExamLocalStorage = () => {
+    localStorage.removeItem('examSessionId');
+    localStorage.removeItem('examQuestions');
+    localStorage.removeItem('examAnswers');
+    localStorage.removeItem('examAnswersTimestamp');
+    localStorage.removeItem('examAnswersBackupCount');
+    localStorage.removeItem('examAnswersFailedSync');
+    localStorage.removeItem('examAnswersLastSync');
+    localStorage.removeItem('examSubmission');
+  };
+
+  // Get student data and clear localStorage if student changed
   const getStudentData = () => {
     try {
       const studentId = localStorage.getItem('studentID');
       const rawStudentData = localStorage.getItem('studentData');
       const studentData = rawStudentData ? JSON.parse(rawStudentData) : {};
-      
+      const lastStudentId = localStorage.getItem('lastStudentID');
+      if (studentId !== lastStudentId) {
+        clearExamLocalStorage();
+        localStorage.setItem('lastStudentID', studentId);
+      }
       if (!studentId || studentId === 'GUEST') {
         alert('Missing or invalid student ID. Please log in again.');
         navigate('/dashboard');
         return null;
       }
-      
       return {
         studentId,
         name: `${studentData.first_name || 'Guest'} ${studentData.last_name || 'User'}`,
@@ -259,6 +277,7 @@ const ExamSession = () => {
     try {
       localStorage.setItem('examAnswers', JSON.stringify(answers));
       localStorage.setItem('examAnswersTimestamp', Date.now().toString());
+      localStorage.setItem('examAnswersBackupCount', Object.keys(answers).length.toString());
     } catch (error) {
       console.error('Error saving answers to localStorage:', error);
     }
@@ -268,7 +287,14 @@ const ExamSession = () => {
   const loadAnswersFromLocalStorage = () => {
     try {
       const savedAnswers = localStorage.getItem('examAnswers');
-      if (savedAnswers) {
+      const savedSessionId = localStorage.getItem('examSessionId');
+      const savedStudentId = localStorage.getItem('lastStudentID');
+      // Only load if session and student match
+      if (
+        savedAnswers &&
+        savedSessionId === examSessionId &&
+        savedStudentId === studentInfo?.studentId
+      ) {
         const answers = JSON.parse(savedAnswers);
         setSelectedAnswers(answers);
         return answers;
@@ -281,46 +307,235 @@ const ExamSession = () => {
 
   // Save answers to backend (background operation)
   const saveAnswersToBackend = async (answersToSave = selectedAnswers) => {
-    if (!examSessionId) return;
+    if (!examSessionId) {
+      console.warn('No exam session ID available for saving answers');
+      return;
+    }
 
     try {
-      const promises = [];
-      
+      console.log('Saving answers to backend:', Object.keys(answersToSave).length, 'answers');
+      const savePromises = [];
       for (const [questionId, selectedOption] of Object.entries(answersToSave)) {
-        if (lastSavedAnswers.current[questionId] !== selectedOption) {
+        if (lastSavedAnswers.current[questionId] !== selectedOption && selectedOption) {
+          // Find the question object to get the correct option ID and set required fields
+          let questionObj = null;
+          for (const subjectQuestions of Object.values(allQuestions)) {
+            const found = subjectQuestions.find(q => String(q.id) === String(questionId));
+            if (found) {
+              questionObj = found;
+              break;
+            }
+          }
+
+          let optionIdToSend = selectedOption;
+          let mapped = false;
+          // If question has options array, map letter to ID if needed
+          if (questionObj && questionObj.options && Array.isArray(questionObj.options)) {
+            if (typeof selectedOption === 'string' && selectedOption.length === 1 && /[A-D]/i.test(selectedOption)) {
+              const idx = selectedOption.toUpperCase().charCodeAt(0) - 65;
+              if (questionObj.options[idx]) {
+                optionIdToSend = questionObj.options[idx].id;
+                mapped = true;
+              }
+            }
+          } else if (questionObj) {
+            // Old format: option_a, option_b, ...
+            if (typeof selectedOption === 'string' && selectedOption.length === 1 && /[A-D]/i.test(selectedOption)) {
+              const letter = selectedOption.toUpperCase();
+              const optionText = questionObj[`option_${letter.toLowerCase()}`];
+              if (questionObj.options && Array.isArray(questionObj.options)) {
+                const found = questionObj.options.find(opt => (opt.text || opt.option_text) === optionText);
+                if (found) {
+                  optionIdToSend = found.id;
+                  mapped = true;
+                }
+              } else if (questionObj[`option_${letter.toLowerCase()}_id`]) {
+                optionIdToSend = questionObj[`option_${letter.toLowerCase()}_id`];
+                mapped = true;
+              }
+            }
+          }
+          // Ensure selected_option is a valid integer (option id)
+          if (typeof optionIdToSend === 'string' && /^\d+$/.test(optionIdToSend)) {
+            optionIdToSend = parseInt(optionIdToSend, 10);
+            mapped = true;
+          }
+          if (typeof optionIdToSend !== 'number') {
+            console.error('selected_option is not a valid option id:', optionIdToSend, 'for question', questionId, '| selectedOption:', selectedOption, '| questionObj:', questionObj);
+            if (typeof selectedOption === 'string' && selectedOption.length === 1 && /[A-D]/i.test(selectedOption) && !mapped) {
+              console.error(`Could not map letter answer '${selectedOption}' to an option ID for question ${questionId}. Skipping answer.`);
+              continue;
+            }
+            continue;
+          }
+
+          // Required fields: question_duration_spent, grade
+          // Set grade to 0 (not null) to satisfy backend
           const answerData = {
             session: examSessionId,
             question: questionId,
-            selected_option: selectedOption,
-            answered_at: new Date().toISOString()
+            selected_option: optionIdToSend,
+            completed_at: new Date().toISOString(),
+            question_duration_spent: 0,
+            grade: 0,
+            completed: true // Assuming we mark it as completed
           };
-
-          promises.push(
-            apiCall('answers/', {
-              method: 'POST',
-              body: JSON.stringify(answerData)
-            }).catch(error => {
-              if (error.message.includes('400')) {
-                return apiCall(`answers/${questionId}/`, {
-                  method: 'PUT',
+          savePromises.push(
+            (async () => {
+              try {
+                const response = await fetch(`${CONFIG.API_BASE_URL}${CONFIG.API_PATH}answers/`, {
+                  method: 'POST',
+                  headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `StudentID ${studentInfo?.studentId}`
+                  },
                   body: JSON.stringify(answerData)
                 });
+                if (!response.ok) {
+                  let errorBody = {};
+                  try {
+                    errorBody = await response.json();
+                  } catch (e) {}
+                  console.error(`POST /answers/ failed for question ${questionId}:`, response.status, response.statusText, errorBody);
+                  throw new Error(`POST /answers/ failed: ${response.status} ${response.statusText} - ${JSON.stringify(errorBody)}`);
+                }
+                const postResponse = await response.json();
+                console.log(`POST /answers/ response for question ${questionId}:`, postResponse);
+                if (!postResponse || !postResponse.id) {
+                  console.warn(`POST did not return an answer object for question ${questionId}`);
+                }
+              } catch (error) {
+                // If POST fails (likely already exists), fetch answer by session+question, then PATCH
+                if (error.message.includes('400')) {
+                  try {
+                    const response = await apiCall(`answers/?session=${examSessionId}&question=${questionId}`);
+                    if (Array.isArray(response) && response.length > 0) {
+                      const answerId = response[0].id;
+                      const patchResp = await apiCall(`answers/${answerId}/`, {
+                        method: 'PATCH',
+                        body: JSON.stringify({ selected_option: optionIdToSend, question_duration_spent: 0, grade: null })
+                      });
+                      // Log the PATCH response for debugging
+                      console.log(`PATCH /answers/${answerId}/ response for question ${questionId}:`, patchResp);
+                      if (!patchResp || !patchResp.id) {
+                        console.warn(`PATCH did not return an answer object for question ${questionId}`);
+                      }
+                    } else {
+                      console.error('No answer found to PATCH for question:', questionId);
+                    }
+                  } catch (patchError) {
+                    console.error('PATCH also failed for question:', questionId, patchError);
+                  }
+                } else {
+                  throw error;
+                }
               }
-              throw error;
-            })
+            })()
           );
         }
       }
 
-      await Promise.all(promises);
-      lastSavedAnswers.current = {...answersToSave};
+      // for (const [questionId, selectedOption] of Object.entries(answersToSave)) {
+      //   // Only save if answer has changed or is new
+      //   if (lastSavedAnswers.current[questionId] !== selectedOption && selectedOption) {
+      //     const answerData = {
+      //       session: examSessionId,
+      //       question: questionId,
+      //       selected_option: selectedOption,
+      //       answered_at: new Date().toISOString(),
+      //       student_id: studentInfo.studentId
+      //     };
+
+      //     console.log('Saving answer for question:', questionId, 'option:', selectedOption);
+          
+      //     savePromises.push(
+      //       apiCall('answers/', {
+      //         method: 'POST',
+      //         body: JSON.stringify(answerData)
+      //       }).catch(error => {
+      //         console.log('POST failed, trying PUT for question:', questionId);
+      //         // If answer already exists, update it
+      //         if (error.message.includes('400') || error.message.includes('already exists')) {
+      //           return apiCall(`answers/${questionId}/`, {
+      //             method: 'PUT',
+      //             body: JSON.stringify(answerData)
+      //           }).catch(putError => {
+      //             console.error('PUT also failed for question:', questionId, putError);
+      //             // Try PATCH as alternative
+      //             return apiCall(`answers/${questionId}/`, {
+      //               method: 'PATCH',
+      //               body: JSON.stringify({ selected_option: selectedOption })
+      //             });
+      //           });
+      //         }
+      //         throw error;
+      //       })
+      //     );
+      //   }
+      // }
+
+      if (savePromises.length > 0) {
+        const results = await Promise.allSettled(savePromises);
+        
+        // Check for any failures
+        const failures = results.filter(result => result.status === 'rejected');
+        if (failures.length > 0) {
+          console.error('Some answers failed to save:', failures);
+          // Don't throw error, just log it - we have localStorage backup
+        } else {
+          console.log('All answers saved successfully to backend');
+        }
+        
+        // Update last saved answers only for successful saves
+        lastSavedAnswers.current = {...answersToSave};
+        
+        // Update localStorage with sync status
+        localStorage.setItem('examAnswersLastSync', Date.now().toString());
+      }
       
     } catch (error) {
       console.error('Error saving answers to backend:', error);
-      // Don't show error to user as this is background save
+      // Store failed answers for retry
+      const failedAnswers = JSON.stringify(answersToSave);
+      localStorage.setItem('examAnswersFailedSync', failedAnswers);
     }
   };
 
+  // Initialize or create exam session
+  const initializeExamSession = async () => {
+    try {
+      let sessionId = localStorage.getItem('examSessionId');
+      // Always create a new session on refresh or login
+      const sessionData = {
+        student_id: studentInfo.studentId,
+        exam_id: examInfo.id || 1,
+        started_at: new Date().toISOString(),
+        status: 'in_progress'
+      };
+      console.log('Creating new exam session:', sessionData);
+      const newSession = await apiCall('exam-sessions/', {
+        method: 'POST',
+        body: JSON.stringify(sessionData)
+      });
+      sessionId = newSession.id;
+      localStorage.setItem('examSessionId', sessionId);
+      // Clear answers for new session
+      localStorage.removeItem('examAnswers');
+      localStorage.removeItem('examAnswersTimestamp');
+      localStorage.removeItem('examAnswersBackupCount');
+      localStorage.removeItem('examAnswersFailedSync');
+      localStorage.removeItem('examAnswersLastSync');
+      setExamSessionId(sessionId);
+      return sessionId;
+    } catch (error) {
+      console.error('Error initializing exam session:', error);
+      // Create fallback session ID
+      const fallbackId = `session_${studentInfo.studentId}_${Date.now()}`;
+      localStorage.setItem('examSessionId', fallbackId);
+      setExamSessionId(fallbackId);
+      return fallbackId;
+    }
+  };
   // Submit exam
   const submitExam = async () => {
     setIsSubmitting(true);
@@ -330,7 +545,10 @@ const ExamSession = () => {
       const totalQuestions = Object.values(allQuestions).reduce((sum, subjectQuestions) => sum + subjectQuestions.length, 0);
       
       const confirmed = window.confirm(
-        `Are you sure you want to submit the exam?\n\nAnswered: ${answeredCount}/${totalQuestions} questions\n\nThis action cannot be undone.`
+        `Are you sure you want to submit the exam?\n\n` +
+        `Answered: ${answeredCount}/${totalQuestions} questions\n` +
+        `Time remaining: ${formatTime(timeRemaining)}\n\n` +
+        `This action cannot be undone and will end your exam session.`
       );
       
       if (!confirmed) {
@@ -338,45 +556,82 @@ const ExamSession = () => {
         return;
       }
 
-      // Try to save to backend first
+      console.log('Starting exam submission process...');
+      
+      // Ensure all answers are saved to backend before submission
       try {
+
+        console.log('Saving final answers to backend...');
+        await saveAnswersToBackend(selectedAnswers);
+        
+        // Submit exam session
         if (examSessionId) {
-          await saveAnswersToBackend();
-          
+          console.log('Updating exam session status to completed...');
           const submissionData = {
             status: 'completed',
             submitted_at: new Date().toISOString(),
-            time_taken: CONFIG.EXAM_DURATION - timeRemaining
+            time_taken: CONFIG.EXAM_DURATION - timeRemaining,
+            total_questions: totalQuestions,
+            answered_questions: answeredCount
           };
 
-          await apiCall(`exam-sessions/${examSessionId}/`, {
+          const submissionResponse = await apiCall(`exam-sessions/${examSessionId}/`, {
             method: 'PATCH',
             body: JSON.stringify(submissionData)
           });
+          
+          console.log('Exam session updated successfully:', submissionResponse);
+          
+          // Verify all answers were saved
+          try {
+            const savedAnswers = await apiCall(`exam-sessions/${examSessionId}/answers/`);
+            console.log('Verified saved answers count:', savedAnswers.length);
+            
+            if (savedAnswers.length !== answeredCount) {
+              console.warn(`Answer count mismatch: Expected ${answeredCount}, got ${savedAnswers.length}`);
+            }
+          } catch (verifyError) {
+            console.warn('Could not verify saved answers:', verifyError);
+          }
         }
+        
       } catch (backendError) {
         console.error('Backend submission failed:', backendError);
-        // Continue with localStorage submission
+        
+        // Show error but allow user to decide
+        const continueAnyway = window.confirm(
+          'There was an error submitting to the server. Your answers are saved locally.\n\n' +
+          'Do you want to continue with submission? (Your answers will be preserved)'
+        );
+        
+        if (!continueAnyway) {
+          setIsSubmitting(false);
+          return;
+        }
       }
 
       // Save submission data to localStorage as backup
       const submissionData = {
         studentId: studentInfo.studentId,
+        examId: examInfo.id,
+        sessionId: examSessionId,
         answers: selectedAnswers,
         submittedAt: new Date().toISOString(),
         timeTaken: CONFIG.EXAM_DURATION - timeRemaining,
         totalQuestions,
-        answeredQuestions: answeredCount
+        answeredQuestions: answeredCount,
+        subjects: subjects.map(s => s.name).join(', ')
       };
       
       localStorage.setItem('examSubmission', JSON.stringify(submissionData));
+      console.log('Submission data saved to localStorage');
       
       // Clear exam data
-      localStorage.removeItem('examSessionId');
       localStorage.removeItem('examQuestions');
       localStorage.removeItem('examAnswers');
+      localStorage.removeItem('examAnswersFailedSync');
       
-      alert('Exam submitted successfully!');
+      console.log('Exam submission completed successfully');
       navigate('/exam-complete', { 
         state: { 
           submissionData,
@@ -386,7 +641,7 @@ const ExamSession = () => {
       
     } catch (error) {
       console.error('Error submitting exam:', error);
-      alert('Failed to submit exam. Please try again.');
+      alert(`Failed to submit exam: ${error.message}\n\nPlease try again or contact support if the problem persists.`);
     } finally {
       setIsSubmitting(false);
     }
@@ -401,6 +656,12 @@ const ExamSession = () => {
     
     setSelectedAnswers(newAnswers);
     saveAnswersToLocalStorage(newAnswers);
+    
+    // Trigger background save to server after short delay
+    clearTimeout(autoSaveRef.current);
+    autoSaveRef.current = setTimeout(() => {
+      saveAnswersToBackend(newAnswers);
+    }, 2000); // Save 2 seconds after user stops selecting
   };
 
   const handleNextQuestion = () => {
@@ -561,29 +822,52 @@ const ExamSession = () => {
     const initializeExam = async () => {
       await loadExamInfo();
       await loadSubjects();
+      await initializeExamSession();
       await loadAllQuestions();
     };
     
     initializeExam();
     loadAnswersFromLocalStorage();
-    
-    // Initialize exam session ID
-    const sessionId = localStorage.getItem('examSessionId') || `session_${Date.now()}`;
-    setExamSessionId(sessionId);
-    localStorage.setItem('examSessionId', sessionId);
   }, []);
 
   // Auto-save to backend periodically
   useEffect(() => {
     if (examSessionId && Object.keys(selectedAnswers).length > 0) {
       const interval = setInterval(() => {
-        saveAnswersToBackend();
+        console.log('Periodic auto-save triggered');
+        saveAnswersToBackend(selectedAnswers);
       }, CONFIG.AUTO_SAVE_INTERVAL);
 
       return () => clearInterval(interval);
     }
   }, [selectedAnswers, examSessionId]);
 
+  // Retry failed syncs
+  useEffect(() => {
+    const retryFailedSync = () => {
+      const failedAnswers = localStorage.getItem('examAnswersFailedSync');
+      if (failedAnswers && examSessionId) {
+        try {
+          const answers = JSON.parse(failedAnswers);
+          console.log('Retrying failed answer sync...');
+          saveAnswersToBackend(answers).then(() => {
+            localStorage.removeItem('examAnswersFailedSync');
+            console.log('Failed answers successfully synced');
+          });
+        } catch (error) {
+          console.error('Error retrying failed sync:', error);
+        }
+      }
+    };
+
+    // Retry failed syncs every 30 seconds
+    const retryInterval = setInterval(retryFailedSync, 30000);
+    
+    // Also retry immediately if we have failed syncs
+    retryFailedSync();
+    
+    return () => clearInterval(retryInterval);
+  }, [examSessionId]);
   // Timer effect
   useEffect(() => {
     if (timeRemaining <= 0) return;
@@ -1233,6 +1517,18 @@ const ExamSession = () => {
                     <p className="text-muted small mb-3">
                       Answered: {answeredCount}/{totalQuestions} questions
                     </p>
+                    <div className="mb-3">
+                      <div className="d-flex justify-content-between align-items-center">
+                        <small className="text-muted">Answers Saved:</small>
+                        <small className={`${
+                          Object.keys(selectedAnswers).length === Object.keys(lastSavedAnswers.current).length 
+                            ? 'text-success' 
+                            : 'text-warning'
+                        }`}>
+                          {Object.keys(lastSavedAnswers.current).length}/{Object.keys(selectedAnswers).length}
+                        </small>
+                      </div>
+                    </div>
                     <button
                       onClick={submitExam}
                       disabled={isSubmitting}
@@ -1250,6 +1546,20 @@ const ExamSession = () => {
                         </>
                       )}
                     </button>
+                  </div>
+                  
+                  {/* Sync Status */}
+                  <div className="mb-2">
+                    <small className="text-muted d-flex align-items-center">
+                      <i className={`fas ${
+                        Object.keys(selectedAnswers).length === Object.keys(lastSavedAnswers.current).length 
+                          ? 'fa-check-circle text-success' 
+                          : 'fa-sync-alt fa-spin text-warning'
+                      } me-1`}></i>
+                      {Object.keys(selectedAnswers).length === Object.keys(lastSavedAnswers.current).length 
+                        ? 'All answers synced' 
+                        : 'Syncing answers...'}
+                    </small>
                   </div>
                 </div>
               </div>
