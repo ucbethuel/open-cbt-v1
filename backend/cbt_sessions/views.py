@@ -15,6 +15,7 @@ class ExamSessionViewSet(viewsets.ModelViewSet):
     permission_classes = [IsAuthenticated]
 
     def get_queryset(self):
+        # Only sessions belonging to the logged in user
         return ExamSession.objects.filter(student=self.request.user)
 
     def get_serializer_class(self):

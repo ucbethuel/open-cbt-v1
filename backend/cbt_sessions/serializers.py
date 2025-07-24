@@ -1,12 +1,8 @@
-import logging
 from rest_framework import serializers
-
 from institutions.serializers import InstitutionalSerializers
 from .models import ExamSession, Answer
 from exams.models import Question
 from exams.serializers import QuestionSerializer
-
-logger = logging.getLogger(__name__)
 
 
 class AnswerSerializer(serializers.ModelSerializer):
@@ -62,7 +58,6 @@ class ExamSessionSerializer(serializers.ModelSerializer):
     subject = serializers.SerializerMethodField()
     questions = serializers.SerializerMethodField()
     institution = InstitutionalSerializers(source='student.institution', read_only=True)
-
 
     class Meta:
         model = ExamSession
@@ -127,10 +122,7 @@ class ExamSessionUpdateSerializer(serializers.ModelSerializer):
 
         instance.save()
 
-        # Handle answer updates
         answers_data = validated_data.get('answers', [])
-        logger.info(f"Patching {len(answers_data)} answers for session {instance.id}")
-
         for answer_data in answers_data:
             question = answer_data['question']
 
@@ -142,7 +134,7 @@ class ExamSessionUpdateSerializer(serializers.ModelSerializer):
             is_correct = selected_option == correct_option
             awarded_grade = question.score if is_correct else 0.00
 
-            obj, created = Answer.objects.update_or_create(
+            Answer.objects.update_or_create(
                 session=instance,
                 question=question,
                 defaults={
@@ -156,6 +148,5 @@ class ExamSessionUpdateSerializer(serializers.ModelSerializer):
                     'grade': answer_data.get('grade'),
                 }
             )
-            logger.info(f"{'Created' if created else 'Updated'} answer with id={obj.id}")
 
         return instance
